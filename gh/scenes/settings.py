@@ -59,6 +59,8 @@ class SettingsScene(Scene):
         R.append(("bool", "set.no_fail", lambda: s.engine.no_fail, lambda x: setattr(s.engine, "no_fail", x)))
         R.append(("bool", "set.timing_meter", lambda: bool(s.extra.get("show_timing", True)),
                   lambda x: s.extra.__setitem__("show_timing", x)))
+        R.append(("bool", "set.bg_video", lambda: bool(s.extra.get("bg_video", True)),
+                  lambda x: s.extra.__setitem__("bg_video", bool(x))))
         R.append(("header", "set.h_audio"))
         R.append(("num", "set.master_volume", lambda: a.master_volume, lambda x: setattr(a, "master_volume", x), 0.05, 0.0,
                   1.0, lambda x: f"{int(round(x * 100))}%"))

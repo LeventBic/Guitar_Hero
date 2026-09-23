@@ -104,6 +104,7 @@ def fill_song_info(ini: dict[str, str], info: SongInfo | None = None) -> SongInf
     info.song_length_ms = _int(ini.get("song_length"), info.song_length_ms)
     info.preview_start_ms = _int(ini.get("preview_start_time"), info.preview_start_ms)
     info.delay_ms = _int(ini.get("delay"), info.delay_ms)
+    info.video_start_ms = _int(ini.get("video_start_time"), info.video_start_ms)
     hf = _int(ini.get("hopo_frequency"), None)
     if hf is not None and hf > 0:
         info.hopo_frequency = hf

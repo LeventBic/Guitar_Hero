@@ -5,6 +5,7 @@ pygame-ce==2.5.8
 numpy==2.5.3
 onnxruntime==1.30.0          # gitar kalibrasyonu (Demucs + basic-pitch ONNX modelleri, assets/models)
 soundfile==0.14.0            # OGG stem yazimi / etiket okuma
+av==18.1.0                   # arka plan videosu (PyAV / FFmpeg)
 
 # gelistirme: testler ve exe paketleme
 pytest==9.1.1

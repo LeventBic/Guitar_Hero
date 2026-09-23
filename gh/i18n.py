@@ -114,6 +114,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "set.highway_length": {"en": "Highway length", "tr": "Otoban uzunluğu"},
     "set.no_fail": {"en": "No Fail", "tr": "No Fail"},
     "set.timing_meter": {"en": "Timing meter", "tr": "Zamanlama göstergesi"},
+    "set.bg_video": {"en": "Background video", "tr": "Arka plan videosu"},
     "set.master_volume": {"en": "Master volume", "tr": "Ana ses"},
     "set.sfx_volume": {"en": "SFX volume", "tr": "Efekt sesi"},
     "set.audio_offset": {"en": "Audio offset", "tr": "Ses gecikmesi"},

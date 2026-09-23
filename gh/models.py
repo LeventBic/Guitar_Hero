@@ -103,6 +103,7 @@ class SongInfo:
     song_length_ms: int = 0
     preview_start_ms: int = 0
     delay_ms: int = 0                     # song.ini delay (+: notalar daha gec)
+    video_start_ms: int = 0               # song.ini video_start_time: sarki 0 s'de videonun konumu (ms)
     hopo_frequency: int | None = None     # song.ini hopo_frequency (tick)
     sustain_cutoff_threshold: int | None = None
     diff_guitar: int = -1

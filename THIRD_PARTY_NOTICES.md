@@ -39,6 +39,7 @@ OF ANY KIND. The model file was converted to ONNX; no other changes were made to
 - NumPy — BSD-3-Clause (https://numpy.org)
 - ONNX Runtime — MIT (https://github.com/microsoft/onnxruntime)
 - python-soundfile — BSD-3-Clause, with libsndfile — LGPL-2.1 (https://github.com/bastibe/python-soundfile)
+- PyAV — BSD-3-Clause (https://github.com/PyAV-Org/PyAV), with FFmpeg libraries — LGPL-2.1+ (https://ffmpeg.org)
 - PyInstaller bootloader — GPL-2.0 with bootloader exception (https://pyinstaller.org)
 
 ## Songs

@@ -104,7 +104,7 @@ def _save(surf: pygame.Surface, path: str, scale: float = 1.0) -> None:
 
 def screenshot_gameplay(app, info, diff: str, at: float, path: str, scale: float = 1.0, autoplay: bool = True) -> None:
     from .scenes.gameplay import GameplayScene
-    scene = GameplayScene(app, info, diff, autoplay=autoplay, sim=True)
+    scene = GameplayScene(app, info, diff, autoplay=autoplay, sim=True, video=True)
     app.stack = [scene]
     scene.enter()
     dt = 1.0 / 60.0
@@ -113,8 +113,19 @@ def screenshot_gameplay(app, info, diff: str, at: float, path: str, scale: float
     while scene.visual_time < at and not scene.done:
         scene.update(dt)
         scene.draw(app.screen)
+    if scene.video is not None:                  # arka plan videosu: hedef zamanin karesi cozulene kadar bekle
+        import time as _time
+        end = _time.time() + 3.0
+        while _time.time() < end:
+            scene.draw(app.screen)
+            cur = scene.video._cur
+            want = scene.visual_time + (scene.lead_in if scene.video.loop else 0.0) + scene.video.start_offset
+            if cur is not None and abs(cur[0] - want) < 0.1:
+                break
+            _time.sleep(0.02)
     scene.draw(app.screen)
     _save(app.screen, path, scale)
+    scene.exit()
     app.stack = []
 
 

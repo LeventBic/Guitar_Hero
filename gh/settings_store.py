@@ -23,6 +23,7 @@ DEFAULT_EXTRA = {
     "joy_deadzone": 0.35,
     "tilt_threshold": 0.55,
     "show_timing": True,
+    "bg_video": True,
 }
 
 

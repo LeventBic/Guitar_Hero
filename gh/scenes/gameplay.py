@@ -10,7 +10,7 @@ from ..audio import Conductor
 from ..engine import EvType, GuitarEngine, InputEvent, InputKind, autoplay_inputs
 from ..engine.rules import sustain_ends
 from ..i18n import diff_name, section_label, t, upper
-from ..render.assets import GOLD, NEON_ORANGE, NEON_PINK, TEXT, TEXT_DIM, W
+from ..render.assets import GOLD, H, NEON_ORANGE, NEON_PINK, TEXT, TEXT_DIM, W
 from ..render.highway import HighwayRenderer
 from ..render.hud import HUD
 from ..render.ui import MenuList, StageBackground, draw_hints, draw_panel, fade_overlay
@@ -24,7 +24,8 @@ END_PAD = 2.2
 class GameplayScene(Scene):
     blocks_import = True
 
-    def __init__(self, app, info, difficulty: str, *, autoplay: bool = False, sim: bool = False):
+    def __init__(self, app, info, difficulty: str, *, autoplay: bool = False, sim: bool = False,
+                 video: bool | None = None):
         super().__init__(app)
         self.info = info
         self.difficulty = difficulty
@@ -82,6 +83,12 @@ class GameplayScene(Scene):
         # render
         album = app.assets.album(cinfo.album_art or info.album_art, 512)
         self.stage = StageBackground(album)
+        self.video = None
+        if (not sim if video is None else video) and s.extra.get("bg_video", True):
+            from ..video import open_background
+            self.video = open_background(info.folder, f"{self.artist} - {self.title}", (W, H),
+                                         start_offset_ms=cinfo.video_start_ms or info.video_start_ms)
+        self.video_dim = pygame.Surface((W, H))
         self.highway = HighwayRenderer(app.assets, s)
         self.hud = HUD(app.assets, s)
         self.dropped: dict[int, bool] = {}
@@ -116,6 +123,9 @@ class GameplayScene(Scene):
 
     def exit(self) -> None:
         self.conductor.stop()
+        if self.video is not None:
+            self.video.close()
+            self.video = None
 
     def resume(self) -> None:
         pass
@@ -319,7 +329,20 @@ class GameplayScene(Scene):
 
     # ------------------------------------------------------------------ cizim
     def draw(self, surf: pygame.Surface) -> None:
-        self.stage.draw(surf, self.beat_phase, self.beat_index, self.engine.sp_active)
+        frame = None
+        if self.video is not None:
+            # hazir klipler (dongu) geri sayimda da oynar; sarki videosu sarki saatine kilitli
+            vt = self.visual_time + (self.lead_in if self.video.loop else 0.0)
+            frame = self.video.frame(vt)
+        if frame is not None:
+            surf.blit(frame, (0, 0))
+            # otoban okunabilir kalsin: karart (SP'de hafif mavi), ritimde cok hafif nabiz
+            pulse = max(0.0, 1.0 - self.beat_phase * 4.0)
+            k = int(92 + 18 * pulse)
+            self.video_dim.fill((k - 18, k - 8, k + 30) if self.engine.sp_active else (k, k, k + 6))
+            surf.blit(self.video_dim, (0, 0), special_flags=pygame.BLEND_MULT)
+        else:
+            self.stage.draw(surf, self.beat_phase, self.beat_index, self.engine.sp_active)
         self.highway.draw(surf, self)
         self.hud.draw(surf, self)
 
