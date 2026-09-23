@@ -334,6 +334,9 @@ def stem_ext() -> str:
         return ".wav"
 
 
+OGG_BLOCK = 65536
+
+
 def write_stem(path_noext: str, data: np.ndarray, sr: int, ext: str | None = None) -> str:
     """(kanal, L) veya (L,) float -> <yol>.ogg (Vorbis, ~q0.5) ya da .wav (16 bit). Atomik: gecici dosya + replace."""
     ext = ext or stem_ext()
@@ -354,7 +357,9 @@ def write_stem(path_noext: str, data: np.ndarray, sr: int, ext: str | None = Non
                 f.compression_level = 0.5
             except Exception:
                 pass
-            f.write(a)
+            # tek buyuk write() Windows'ta libvorbis yiginini tasirir (sessiz cokme): bloklar halinde yaz
+            for i in range(0, a.shape[0], OGG_BLOCK):
+                f.write(np.ascontiguousarray(a[i:i + OGG_BLOCK]))
     else:
         d = (np.clip(a, -1, 1) * 32767).astype("<i2")
         with wave.open(tmp, "wb") as w:

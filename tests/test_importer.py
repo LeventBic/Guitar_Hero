@@ -139,7 +139,7 @@ def test_import_wav_end_to_end_with_filename_fallback(tmp_path, synth_song, mixe
     write_wav(str(src), synth_song)
     songs = tmp_path / "Songs"
     stages = []
-    folder = import_audio(str(src), str(songs), lambda f, t: stages.append((f, t)))
+    folder = import_audio(str(src), str(songs), lambda f, t: stages.append((f, t)), use_ai=False)
     assert os.path.basename(folder) == "Test Artist - Synth Song"
     names = set(os.listdir(folder))
     assert {"song.wav", "notes.chart", "song.ini", "album.png"} <= names
@@ -155,7 +155,7 @@ def test_import_wav_end_to_end_with_filename_fallback(tmp_path, synth_song, mixe
     assert 20000 < chart.info.song_length_ms < 30000
     assert 0 <= chart.info.diff_guitar <= 6
     # ayni ad tekrar: benzersiz klasor
-    folder2 = import_audio(str(src), str(songs))
+    folder2 = import_audio(str(src), str(songs), use_ai=False)
     assert os.path.basename(folder2) == "Test Artist - Synth Song (2)"
     # _Import taranmaz
     inbox = songs / "_Import"
@@ -176,7 +176,7 @@ def test_import_ogg_with_tags(tmp_path, synth_song, mixer):
     with sf.SoundFile(src, "w", synth_song.sr, 1, format="OGG") as f:
         f.title, f.artist, f.album, f.date, f.genre = "Ogg Title", "Ogg Band", "Ogg Album", "2019", "Rock"
         f.write(synth_song.samples)
-    folder = import_audio(src, str(tmp_path / "Songs"))
+    folder = import_audio(src, str(tmp_path / "Songs"), use_ai=False)
     assert os.path.basename(folder) == "Ogg Band - Ogg Title"
     info = load_song(folder).info
     assert (info.name, info.artist, info.album, info.year, info.genre) == ("Ogg Title", "Ogg Band", "Ogg Album",
@@ -208,7 +208,7 @@ def test_embedded_cover_is_used(tmp_path, synth_song, mixer):
     body = data[12:] + chunk
     tagged = tmp_path / "tagged.wav"
     tagged.write_bytes(b"RIFF" + struct.pack("<I", 4 + len(body)) + b"WAVE" + body)
-    folder = import_audio(str(tagged), str(tmp_path / "Songs"))
+    folder = import_audio(str(tagged), str(tmp_path / "Songs"), use_ai=False)
     assert os.path.basename(folder) == "Cover Band - Covered"
     art = pygame.image.load(os.path.join(folder, "album.png"))
     assert art.get_size() == (512, 512)
@@ -238,12 +238,12 @@ def test_rechart_regenerates_same_chart(tmp_path, synth_song, mixer):
     from gh.importer import import_audio, rechart_song
     src = tmp_path / "Re - Chart.wav"
     write_wav(str(src), synth_song)
-    folder = import_audio(str(src), str(tmp_path / "Songs"))
+    folder = import_audio(str(src), str(tmp_path / "Songs"), use_ai=False)
     chart_path = os.path.join(folder, "notes.chart")
     original = open(chart_path, encoding="utf-8").read()
     with open(chart_path, "w", encoding="utf-8") as f:
         f.write("[Song]\n{\n}\n")
-    rechart_song(folder)
+    rechart_song(folder, use_ai=False)
     assert open(chart_path, encoding="utf-8").read() == original
     assert os.path.exists(chart_path + ".bak")
 
