@@ -34,7 +34,8 @@ class BeatLine:
 class TempoMap:
     def __init__(self, resolution: int, tempos: list[TempoChange], timesigs: list[TimeSignature] | None = None):
         self.resolution = max(1, int(resolution))
-        tempos = sorted(tempos, key=lambda t: t.tick)
+        # gecersiz (<=0) tempo degerleri sifira bolmeye yol acar -> atla
+        tempos = sorted((t for t in tempos if t.bpm > 0), key=lambda t: t.tick)
         if not tempos or tempos[0].tick != 0:
             tempos.insert(0, TempoChange(0, tempos[0].bpm if tempos else 120.0))
         # ayni tick'te birden fazla tempo varsa sonuncusu gecerli
@@ -54,7 +55,8 @@ class TempoMap:
         self._tempo_ticks = [tc.tick for tc in self.tempos]
         self._tempo_times = [tc.time for tc in self.tempos]
 
-        ts = sorted(timesigs or [], key=lambda s: s.tick)
+        ts = sorted((s for s in (timesigs or []) if s.numerator > 0 and s.denominator > 0),
+                    key=lambda s: s.tick)
         if not ts or ts[0].tick != 0:
             ts.insert(0, TimeSignature(0, 4, 4))
         dts: list[TimeSignature] = []
@@ -118,11 +120,16 @@ class TempoMap:
     # --- cizgiler -----------------------------------------------------------
 
     def beat_lines(self, end_time: float) -> list[BeatLine]:
-        """0'dan end_time'a kadar olcu/beat/yarim-beat cizgileri (sirali)."""
+        """0'dan end_time'a kadar (dahil) olcu/beat/yarim-beat cizgileri (sirali).
+
+        Her TS degisimi yeni bir olcu baslatir (olcu cizgisi TS tick'inde).
+        """
         lines: list[BeatLine] = []
-        end_tick = self.time_to_tick(end_time)
+        end_tick = self.time_to_tick(end_time) + 1e-6
         for i, s in enumerate(self.timesigs):
-            seg_end = self.timesigs[i + 1].tick if i + 1 < len(self.timesigs) else end_tick
+            if s.tick > end_tick:
+                break
+            seg_end = self.timesigs[i + 1].tick if i + 1 < len(self.timesigs) else float("inf")
             tpb = self._ticks_per_beat(s)
             k = 0
             while True:
