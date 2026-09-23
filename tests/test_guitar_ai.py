@@ -71,6 +71,65 @@ def test_ladder_frets_monotone_and_consistent():
         ladder_frets([40, 41, 42, 43, 44, 45], 0.5)
 
 
+def _fake_lead_input(transcribed_lead: bool):
+    """30 s: 10-25 s arasi 8 nota/s yuksek perdeli (E minor) lead onset tepeleri + surekli alcak chug notalari.
+    transcribed_lead=True ise lead notalari basic-pitch notasi olarak da vardir (zayif lead degil)."""
+    from types import SimpleNamespace as NS
+
+    from gh.autochart.guitar import GuitarInput
+    fps = 86.0
+    times = np.arange(int(30 * fps)) / fps
+    onset = np.zeros((times.size, 88), np.float32)
+    note = np.zeros_like(onset)
+    notes = [NS(start=t, end=t + 0.1, pitch=40, amplitude=0.6, onset=True) for t in np.arange(0.5625, 30, 0.125)]
+    scale = [76, 79, 81, 83, 81, 79, 74, 76]
+    lead = [(t, scale[k % len(scale)]) for k, t in enumerate(np.arange(10.0, 25.0, 0.125))]
+    for t, p in lead:
+        i = int(round(t * fps))
+        onset[i, p - 21] = 0.45
+        note[i:i + 8, p - 21] = 0.2                              # esigin (0.3) altinda: basic-pitch nota yazmaz
+        if transcribed_lead:
+            notes.append(NS(start=t, end=t + 0.1, pitch=p, amplitude=0.5, onset=True))
+    gi = GuitarInput(audio=np.zeros(22050 * 30, np.float32), sr=22050, mix=np.zeros(22050 * 30, np.float32),
+                     notes=sorted(notes, key=lambda n: n.start), note_post=note, onset_post=onset, post_times=times)
+    return gi, lead
+
+
+def test_weak_lead_region_and_line():
+    from gh.autochart.guitar import apply_lead, weak_lead_regions
+    gi, lead = _fake_lead_input(False)
+    regions = weak_lead_regions(gi)
+    assert len(regions) == 1
+    a, b = regions[0]
+    assert 9.5 < a < 10.5 and 24.5 < b < 25.5
+    chugs = [_ev(t, 40) for t in np.arange(0.5, 30, 0.125)]
+    out = apply_lead(gi, chugs, regions, lambda t: True)
+    inside = [e for e in out if a <= e.time <= b]
+    assert inside and all(e.root >= 70 for e in inside)            # bolgede chug yok, lead var
+    assert len(inside) >= 0.9 * len(lead)
+    it = np.array([e.time for e in inside])
+    ok = sum(inside[int(np.argmin(np.abs(it - t)))].root == p and np.min(np.abs(it - t)) < 0.012 for t, p in lead)
+    assert ok >= 0.9 * len(lead)
+    assert [e for e in out if e.time < a and e.root == 40]            # bolge disinda ritim kalir
+    # transkribe edilmis lead zayif degildir
+    gi2, _ = _fake_lead_input(True)
+    assert weak_lead_regions(gi2) == []
+
+
+def test_drop_pitch_spikes():
+    from gh.autochart.guitar import _drop_pitch_spikes
+    line = [(i * 0.1, p, 0.5) for i, p in enumerate([76, 79, 81, 55, 79, 76, 103, 79, 81, 88])]
+    out = [p for _t, p, _v in _drop_pitch_spikes(line)]
+    assert out == [76, 79, 81, 79, 79, 76, 79, 79, 81, 88]           # oktav hatalari komsulara tasinir
+    line = [(i * 0.1, p, 0.5) for i, p in enumerate([76, 79, 81, 76, 79, 97, 81, 79, 76])]
+    assert 97 not in [p for _t, p, _v in _drop_pitch_spikes(line)]   # oktavla da yaklasmayan sicrama atilir
+
+
+def _ev(t, p):
+    from gh.autochart.guitar import GuitarEvent
+    return GuitarEvent(time=float(t), strength=0.6, pitches=[p], root=float(p), size=1, end=float(t) + 0.1)
+
+
 # --------------------------------------------------------------------------- boru hatti (ayristirma atlanir)
 
 @pytest.fixture(scope="module")

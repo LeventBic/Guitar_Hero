@@ -35,6 +35,10 @@ CLUSTER_S = 0.045
 MIN_EVENT_STRENGTH = 0.2
 HARMONIC_INTERVALS = {12, 19, 24, 28, 31, 36}
 SEXTUPLET = np.arange(7) / 6.0
+LEAD_LO, LEAD_HI = 59, 92                     # zayif lead cizgisinin perde bandi (B3 .. G#6)
+LEAD_HARMONICS = np.array([0, 12, 19, 24, 28, 31, 34, 36])
+LEAD_MIN_RATE = 5.0                           # aciklanamayan yuksek onset tepesi / s
+LEAD_MIN_SECONDS = 3.0
 
 
 @dataclass
@@ -184,7 +188,7 @@ def analyse_pitches(pitches: list[int], amps: list[float]) -> tuple[list[int], f
     return keep, float(salient), 1
 
 
-def _posterior_end(gi: GuitarInput, t: float, pitch: int, max_s: float = 4.0) -> float:
+def _posterior_end(gi: GuitarInput, t: float, pitch: int, max_s: float = 4.0, thr: float = 0.25) -> float:
     if gi.note_post is None or gi.post_times is None:
         return t
     col = pitch - 21
@@ -194,7 +198,7 @@ def _posterior_end(gi: GuitarInput, t: float, pitch: int, max_s: float = 4.0) ->
     last = i
     gap = 0
     while i < gi.post_times.size and gi.post_times[i] < t + max_s:
-        if gi.note_post[i, col] >= 0.25:
+        if gi.note_post[i, col] >= thr:
             last = i
             gap = 0
         else:
@@ -286,7 +290,145 @@ def build_events(gi: GuitarInput, act_t: np.ndarray, act: np.ndarray,
         events.append(GuitarEvent(time=tc, strength=float(strength), pitches=keep, root=float(root), size=size,
                                   end=max(end, tc), picked=s_f >= 0.45, low=low, bright=bright))
     fix_octaves(events)
-    return chug_fill(gi, events, active)
+    events = chug_fill(gi, events, active)
+    regions = weak_lead_regions(gi)
+    if regions:
+        events = apply_lead(gi, events, regions, active)
+    return events
+
+
+# --------------------------------------------------------------------------- zayif lead (distorsiyonlu solo)
+
+def onset_peaks(gi: GuitarInput, lo: int, hi: int, thr: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """basic-pitch onset posteriorunda [lo, hi] perde bandinin zamanda yerel tepeleri: (zaman, perde, deger)."""
+    if gi.onset_post is None or gi.post_times is None or gi.onset_post.shape[0] < 3:
+        return np.zeros(0), np.zeros(0, dtype=int), np.zeros(0)
+    band = gi.onset_post[:, lo - 21:hi - 21 + 1]
+    m = band.max(axis=1)
+    pk = np.r_[False, (m[1:-1] > m[:-2]) & (m[1:-1] >= m[2:]) & (m[1:-1] > thr), False]
+    n = min(pk.size, gi.post_times.size)
+    pk = pk[:n]
+    return gi.post_times[:n][pk], band[:n][pk].argmax(axis=1) + lo, m[:n][pk]
+
+
+def _explained(gi: GuitarInput, times: np.ndarray, pitches: np.ndarray, tol: float = 0.04,
+               held_s: float = 0.3) -> np.ndarray:
+    """Tepe transkribe edilmis notalarla aciklanabiliyor mu: ayni anda (+-tol) baslayan bir nota var (pena
+    vurusunun distorsiyon harmonikleri) ya da o an tutulan uzun (>= held_s) bir notanin harmonigi (oktav, 12'li,
+    ...; tutulan distorsiyonlu akorlarin vuruntusu)."""
+    st = np.array([float(n.start) for n in gi.notes])
+    en = np.array([float(n.end) for n in gi.notes])
+    sp = np.array([int(n.pitch) for n in gi.notes])
+    order = np.argsort(st)
+    st, en, sp = st[order], en[order], sp[order]
+    held = en - st >= held_s
+    hs, he, hp = st[held], en[held], sp[held]
+    out = np.zeros(times.size, dtype=bool)
+    for i, (t, p) in enumerate(zip(times, pitches)):
+        a, b = np.searchsorted(st, t - tol), np.searchsorted(st, t + tol, side="right")
+        if b > a:
+            out[i] = True
+            continue
+        k = (hs <= t) & (he >= t)
+        if k.any():
+            d = int(p) - hp[k]
+            out[i] = bool(np.any(np.min(np.abs(d[:, None] - LEAD_HARMONICS[None, :]), axis=1) <= 1))
+    return out
+
+
+def weak_lead_regions(gi: GuitarInput, win: float = 6.0, hop: float = 1.0) -> list[tuple[float, float]]:
+    """Distorsiyonlu solo: ritim gitari (chug) ile ayni stem'de, basic-pitch notalari esigin altinda kalir ama
+    yuksek perdede yogun onset tepeleri birakir. Tepelerin cogu hicbir notayla / harmonigiyle
+    aciklanamiyor (>= %50), saniyede >= 5 ve perdeleri yuksekse (medyan >= 72) bolge 'zayif lead' sayilir."""
+    pt, pp, _pv = onset_peaks(gi, 64, LEAD_HI, 0.3)
+    if pt.size < LEAD_MIN_RATE * win:
+        return []
+    un = ~_explained(gi, pt, pp)
+    marked: list[tuple[float, float]] = []
+    for s in np.arange(0.0, float(pt[-1]) + hop, hop):
+        w = (pt >= s) & (pt < s + win)
+        n = int(w.sum())
+        u = w & un
+        nu = int(u.sum())
+        if nu >= LEAD_MIN_RATE * win and nu >= 0.5 * n and float(np.median(pp[u])) >= 72:
+            marked.append((float(s), float(s + win)))
+    regions: list[tuple[float, float]] = []
+    for a, b in marked:
+        if regions and a <= regions[-1][1]:
+            regions[-1] = (regions[-1][0], max(regions[-1][1], b))
+        else:
+            regions.append((a, b))
+    out = []
+    for a, b in regions:                       # pencere kenarlarini ilk / son aciklanamayan tepeye daralt
+        k = np.nonzero((pt >= a) & (pt < b) & un)[0]
+        if k.size:
+            a2, b2 = float(pt[k[0]]) - 0.05, float(pt[k[-1]]) + 0.1
+            if b2 - a2 >= LEAD_MIN_SECONDS:
+                out.append((a2, b2))
+    return out
+
+
+def lead_events(gi: GuitarInput, regions: list[tuple[float, float]], active) -> list[GuitarEvent]:
+    """Zayif lead bolgelerinde tek sesli cizgi: onset tepeleri (dusuk esik), 40 ms icinde en gucluye birlestirilir,
+    perde = tepe perdesi, bitis = nota posteriorunun dusuk esikle takibi."""
+    pt, pp, pv = onset_peaks(gi, LEAD_LO, LEAD_HI, 0.25)
+    keep = np.zeros(pt.size, dtype=bool)
+    for a, b in regions:
+        keep |= (pt >= a) & (pt <= b)
+    pt, pp, pv = pt[keep], pp[keep], pv[keep]
+    merged: list[tuple[float, int, float]] = []
+    for t, p, v in zip(pt, pp, pv):
+        if merged and t - merged[-1][0] <= CLUSTER_S - 0.005:
+            if v > merged[-1][2]:
+                merged[-1] = (float(t), int(p), float(v))
+            continue
+        merged.append((float(t), int(p), float(v)))
+    merged = _drop_pitch_spikes(merged)
+    out = []
+    for i, (t, p, v) in enumerate(merged):
+        if not active(t):
+            continue
+        nxt = merged[i + 1][0] if i + 1 < len(merged) else t + 4.0
+        end = min(_posterior_end(gi, t, p, thr=0.12), nxt)
+        out.append(GuitarEvent(time=t, strength=float(min(1.0, 0.3 + v)), pitches=[p], root=float(p), size=1,
+                               end=max(end, t), picked=False, low=0.0, bright=0.0))
+    return out
+
+
+def _drop_pitch_spikes(line: list[tuple[float, int, float]], span: float = 0.35) -> list[tuple[float, int, float]]:
+    """Tek sesli cizgide komsularin (+-span s) medyanindan bir oktavdan fazla sapan tekil perdeler: oktav
+    kaydirmasi yetiyorsa kaydir (harmonik / oktav hatasi), yetmiyorsa at."""
+    if len(line) < 3:
+        return line
+    t = np.array([x[0] for x in line])
+    p = np.array([x[1] for x in line], dtype=np.float64)
+    out = []
+    for i, (ti, pi, vi) in enumerate(line):
+        a, b = np.searchsorted(t, ti - span), np.searchsorted(t, ti + span, side="right")
+        nb = np.r_[p[a:i], p[i + 1:b]]
+        if nb.size < 2:
+            out.append((ti, pi, vi))
+            continue
+        med = float(np.median(nb))
+        if abs(pi - med) <= 12:
+            out.append((ti, pi, vi))
+            continue
+        q = pi - 12 * int(round((pi - med) / 12))
+        if abs(q - med) <= 7 and LEAD_LO <= q <= LEAD_HI:
+            out.append((ti, int(q), vi))
+    return out
+
+
+def apply_lead(gi: GuitarInput, events: list[GuitarEvent], regions: list[tuple[float, float]],
+               active) -> list[GuitarEvent]:
+    """Zayif lead bolgelerindeki ritim (chug) olaylarini lead cizgisiyle degistir (Guitar Hero sololari calar)."""
+    lead = lead_events(gi, regions, active)
+    if not lead:
+        return events
+
+    def inside(t: float) -> bool:
+        return any(a <= t <= b for a, b in regions)
+    return sorted([e for e in events if not inside(e.time)] + lead, key=lambda e: e.time)
 
 
 def _low_ratio(pa: dsp.PitchAnalyzer, t: float) -> float:
