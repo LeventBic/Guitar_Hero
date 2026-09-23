@@ -221,7 +221,7 @@ class CalibrationScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 14, 170))
         surf.blit(shade, (0, 0))
-        head = tc.glow(t("cal.title"), 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
+        head = tc.glow(t("cal.title"), 42, (255, 214, 140), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (W // 2 - head.get_width() // 2, 18))
         s = self.app.settings
         cur = tc.render(t("cal.current", a=f"{s.audio.audio_offset_ms:+d}", v=f"{s.video.video_offset_ms:+d}"),
@@ -296,9 +296,9 @@ class CalibrationScene(Scene):
             k = math.exp(-max(0.0, age) * 7.0) if beat_i >= 0 else 0.0
             cx, cy = W // 2, panel.y + 230
             r = int(70 + 30 * k)
-            col = lerp_color((60, 50, 100), NEON_PINK if beat_i % 4 == 0 else NEON_CYAN, k)
+            col = lerp_color((78, 68, 58), NEON_PINK if beat_i % 4 == 0 else NEON_CYAN, k)
             pygame.draw.circle(surf, col, (cx, cy), r, 6)
-            pygame.draw.circle(surf, lerp_color((20, 16, 40), col, k * 0.6), (cx, cy), r - 10)
+            pygame.draw.circle(surf, lerp_color((28, 24, 21), col, k * 0.6), (cx, cy), r - 10)
             if beat_i < COUNT_IN - 1:
                 txt = str(COUNT_IN - 1 - beat_i) if beat_i >= 0 else t("cal.get_ready")
                 img = tc.render(txt, 48 if beat_i >= 0 else 26, TEXT, "title", True)

@@ -41,6 +41,11 @@ class SettingsScene(Scene):
         self.orig_buffer = app.settings.audio.buffer
         self.rows = self._rows()
 
+    def _set_bg_video(self, on) -> None:
+        from ..render import ui as _ui
+        self.app.settings.extra["bg_video"] = bool(on)
+        _ui.menu_video_enabled = bool(on)
+
     # --------------------------------------------------------------- satirlar
     def _rows(self):
         s = self.app.settings
@@ -59,8 +64,7 @@ class SettingsScene(Scene):
         R.append(("bool", "set.no_fail", lambda: s.engine.no_fail, lambda x: setattr(s.engine, "no_fail", x)))
         R.append(("bool", "set.timing_meter", lambda: bool(s.extra.get("show_timing", True)),
                   lambda x: s.extra.__setitem__("show_timing", x)))
-        R.append(("bool", "set.bg_video", lambda: bool(s.extra.get("bg_video", True)),
-                  lambda x: s.extra.__setitem__("bg_video", bool(x))))
+        R.append(("bool", "set.bg_video", lambda: bool(s.extra.get("bg_video", True)), self._set_bg_video))
         R.append(("header", "set.h_audio"))
         R.append(("num", "set.master_volume", lambda: a.master_volume, lambda x: setattr(a, "master_volume", x), 0.05, 0.0,
                   1.0, lambda x: f"{int(round(x * 100))}%"))
@@ -229,7 +233,7 @@ class SettingsScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 14, 165))
         surf.blit(shade, (0, 0))
-        head = tc.glow(t("set.title"), 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
+        head = tc.glow(t("set.title"), 42, (255, 214, 140), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (40, 14))
         panel = pygame.Rect(30, 80, 720, ROW_H * VISIBLE + 20)
         draw_panel(surf, panel, border=NEON_PURPLE)
@@ -246,14 +250,14 @@ class SettingsScene(Scene):
                 if row[1]:
                     h = tc.render(t(row[1]), 16, NEON_CYAN, "ui", True)
                     surf.blit(h, (r.x + 8, r.y + 12))
-                    pygame.draw.line(surf, (60, 54, 100), (r.x + 8 + h.get_width() + 12, r.centery + 4),
+                    pygame.draw.line(surf, (79, 69, 59), (r.x + 8 + h.get_width() + 12, r.centery + 4),
                                      (r.right - 8, r.centery + 4), 1)
                 continue
             if sel:
                 k = 0.5 + 0.5 * math.sin(self.t * 5)
                 hl = pygame.Surface(r.size, pygame.SRCALPHA)
-                pygame.draw.rect(hl, (255, 60, 170, 55 + int(35 * k)), (0, 0, *r.size), border_radius=8)
-                pygame.draw.rect(hl, (255, 100, 200, 220), (0, 0, *r.size), 2, border_radius=8)
+                pygame.draw.rect(hl, (255, 118, 30, 55 + int(35 * k)), (0, 0, *r.size), border_radius=8)
+                pygame.draw.rect(hl, (255, 176, 72, 220), (0, 0, *r.size), 2, border_radius=8)
                 surf.blit(hl, r.topleft)
             lab = tc.render(t(row[1]), 20, TEXT if sel else (200, 200, 215), "ui", sel)
             surf.blit(lab, (r.x + 16, r.centery - lab.get_height() // 2))

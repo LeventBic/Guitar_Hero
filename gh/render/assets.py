@@ -15,15 +15,18 @@ from ..config import FRET_COLORS, OPEN_COLOR, SP_COLOR
 
 W, H = 1280, 720
 
-# ---- palet
-BG_TOP = (8, 6, 22)
-BG_BOTTOM = (18, 8, 34)
-NEON_PINK = (255, 60, 170)
-NEON_CYAN = (60, 230, 255)
-NEON_PURPLE = (170, 90, 255)
+# ---- palet: rock sahnesi (koyu komur + alev / kehribar + bronz metal). Adlar eski neon temadan kalma;
+# anlamlari: PINK = birincil vurgu (alev), CYAN = ikincil vurgu (kehribar), PURPLE = cerceve (bronz).
+BG_TOP = (10, 8, 8)
+BG_BOTTOM = (28, 14, 9)
+NEON_PINK = (240, 82, 34)
+NEON_CYAN = (255, 190, 82)
+NEON_PURPLE = (156, 122, 84)
 NEON_ORANGE = (255, 150, 40)
-TEXT = (235, 236, 245)
-TEXT_DIM = (150, 150, 175)
+TEXT = (238, 234, 226)
+TEXT_DIM = (172, 164, 152)
+METAL_HI = (86, 80, 76)
+METAL_LO = (22, 20, 20)
 GOLD = (255, 205, 60)
 SP_BLUE = (70, 170, 255)
 MISS_GREY = (95, 95, 105)
@@ -211,6 +214,41 @@ def _gem_body_colors(color, style):
     if style == "star":
         return (255, 255, 255), (120, 220, 255)
     return lighten(color, 0.35), scale_color(color, 0.62)
+
+
+_PANEL_CACHE: "OrderedDict[tuple, pygame.Surface]" = OrderedDict()
+
+
+def metal_panel(size, border=NEON_PURPLE, radius: int = 12, alpha: int = 232, bw: int = 2,
+                screws: bool = True) -> pygame.Surface:
+    """Koyu metal plaka: dikey degrade + ust parlama, ust isik cizgisi, renkli cerceve, vida basi."""
+    w, h = int(size[0]), int(size[1])
+    key = (w, h, tuple(border), radius, alpha, bw, screws)
+    s = _PANEL_CACHE.get(key)
+    if s is not None:
+        _PANEL_CACHE.move_to_end(key)
+        return s
+    body = vertical_gradient((w, h), METAL_HI + (alpha,), METAL_LO + (alpha,), alpha=True)
+    sheen = vertical_gradient((w, max(2, h // 3)), (255, 255, 255, 16), (255, 255, 255, 0), alpha=True)
+    body.blit(sheen, (0, 0))                              # ust kisimda yumusak metal parlamasi
+    mask = pygame.Surface((w, h), pygame.SRCALPHA)
+    pygame.draw.rect(mask, (255, 255, 255, 255), (0, 0, w, h), border_radius=radius)
+    body.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    s = body
+    pygame.draw.rect(s, (0, 0, 0, 200), (0, 0, w, h), bw + 2, border_radius=radius)            # dis golge
+    pygame.draw.rect(s, tuple(border) + (235,), (1, 1, w - 2, h - 2), bw, border_radius=radius)
+    pygame.draw.line(s, lighten(border, 0.55) + (170,), (radius, bw + 2), (w - radius, bw + 2))  # ust isik
+    pygame.draw.line(s, (0, 0, 0, 120), (radius, h - bw - 3), (w - radius, h - bw - 3))
+    if screws and w >= 160 and h >= 90:
+        for cx, cy in ((10, 10), (w - 11, 10), (10, h - 11), (w - 11, h - 11)):
+            pygame.draw.circle(s, (18, 16, 16, 255), (cx, cy), 5)
+            pygame.draw.circle(s, (150, 144, 136, 255), (cx, cy), 4)
+            pygame.draw.circle(s, (230, 226, 218, 255), (cx - 1, cy - 1), 2)
+            pygame.draw.line(s, (40, 36, 34, 255), (cx - 3, cy + 1), (cx + 2, cy - 2), 1)
+    _PANEL_CACHE[key] = s
+    if len(_PANEL_CACHE) > 64:
+        _PANEL_CACHE.popitem(last=False)
+    return s
 
 
 def draw_gem_master(color, kind: str, style: str) -> tuple[pygame.Surface, int]:

@@ -296,7 +296,7 @@ class ImportScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 14, 160))
         surf.blit(shade, (0, 0))
-        head = tc.glow(t("imp.title"), 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
+        head = tc.glow(t("imp.title"), 42, (255, 214, 140), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (40, 14))
         if self.mode == "drop":
             self._draw_drop(surf)
@@ -364,15 +364,15 @@ class ImportScene(Scene):
         flash = max(0.0, 1.0 - (time.perf_counter() - self.app.drop_flash) / 0.8) if self.app.drop_flash else 0.0
         fill = pygame.Surface(zone.size, pygame.SRCALPHA)
         k = 0.5 + 0.5 * math.sin(self.t * 2.2)
-        pygame.draw.rect(fill, (40 + int(60 * flash), 14, 70, 150 + int(60 * flash)), (0, 0, *zone.size),
+        pygame.draw.rect(fill, (34 + int(70 * flash), 22 + int(30 * flash), 14, 165 + int(60 * flash)), (0, 0, *zone.size),
                          border_radius=22)
         surf.blit(fill, zone.topleft)
-        col = tuple(int(c1 + (c2 - c1) * max(k * 0.5, flash)) for c1, c2 in zip(NEON_PINK, (255, 255, 255)))
+        col = tuple(int(c1 + (c2 - c1) * max(k * 0.5, flash)) for c1, c2 in zip(NEON_CYAN, (255, 255, 255)))
         self._dashed_rect(surf, zone.inflate(-10, -10), col, phase=self.t * 40)
         # ikon: zipla + asagi ok
         bob = 6 * math.sin(self.t * 3.0)
         cx, cy = zone.centerx, zone.y + 130 + int(bob)
-        self._draw_note_icon(surf, cx - 10, cy, (255, 150, 220))
+        self._draw_note_icon(surf, cx - 10, cy, (255, 190, 110))
         ay = zone.y + 210 + int(bob)
         pygame.draw.polygon(surf, NEON_CYAN, [(cx - 22, ay), (cx + 22, ay), (cx, ay + 22)])
         t1 = tc.glow(t("imp.drop_here"), 36, (255, 235, 250), "ui", True, glow_color=NEON_PINK, radius=6)
@@ -463,7 +463,7 @@ class ImportScene(Scene):
             y += 36
             # ilerleme cubugu (sarki) + toplam
             bar = pygame.Rect(x, y, panel.w - 60, 26)
-            pygame.draw.rect(surf, (30, 24, 54), bar, border_radius=13)
+            pygame.draw.rect(surf, (40, 35, 30), bar, border_radius=13)
             frac = cur.progress if cur else 0.0
             if frac > 0:
                 fr = bar.copy()
@@ -475,12 +475,12 @@ class ImportScene(Scene):
                 # hareketli parilti
                 sx = fr.x + int((self.t * 260) % max(fr.w, 1))
                 pygame.draw.line(surf, (255, 220, 250), (sx, fr.y + 4), (sx, fr.bottom - 5), 3)
-            pygame.draw.rect(surf, (255, 120, 210), bar, 2, border_radius=13)
+            pygame.draw.rect(surf, (255, 204, 124), bar, 2, border_radius=13)
             pct = tc.render(f"{int(frac * 100)}%", 16, TEXT, "ui", True)
             surf.blit(pct, (bar.centerx - pct.get_width() // 2, bar.y + 3))
             y += 34
             tot = pygame.Rect(x, y, panel.w - 60, 6)
-            pygame.draw.rect(surf, (30, 24, 54), tot, border_radius=3)
+            pygame.draw.rect(surf, (40, 35, 30), tot, border_radius=3)
             ov = (done + frac) / total
             if ov > 0:
                 pygame.draw.rect(surf, NEON_CYAN, (tot.x, tot.y, max(6, int(tot.w * ov)), 6), border_radius=3)
@@ -583,14 +583,14 @@ class ImportScene(Scene):
                 a = self.t * 5.0
                 pygame.draw.circle(surf, (255, 230, 180), (int(cx + 6 * math.cos(a)), int(cy + 6 * math.sin(a))), 3)
             else:
-                pygame.draw.circle(surf, (70, 62, 100), (cx, cy), 9, 2)
+                pygame.draw.circle(surf, (86, 75, 64), (cx, cy), 9, 2)
             surf.blit(label, (x + 34, ry + 1))
         if idx < 0:
             surf.blit(tc.render(t("imp.cal_prep") + "...", 16, TEXT_DIM, "ui"), (x + 34, y + 5 * row_h))
         # hareketli gorsel (sag): kayan dalga formu + nabiz atan 5 perde gem'i
         box = pygame.Rect(x + 520, y - 4, panel.right - 30 - (x + 520), 5 * row_h + 6)
         bg = pygame.Surface(box.size, pygame.SRCALPHA)
-        pygame.draw.rect(bg, (18, 12, 36, 220), (0, 0, *box.size), border_radius=12)
+        pygame.draw.rect(bg, (24, 21, 18, 220), (0, 0, *box.size), border_radius=12)
         mid = box.h * 0.36
         n = 64
         bw = box.w / n
@@ -599,7 +599,7 @@ class ImportScene(Scene):
             amp = (0.35 + 0.65 * abs(math.sin(ph * 0.37))) * abs(math.sin(ph)) * (0.55 + 0.45 * math.sin(i * 0.13 + self.t))
             h = max(2, int(amp * mid * 0.9))
             lit = abs((i / n) - ((self.t * 0.35) % 1.0)) < 0.06
-            col = (255, 170, 90, 230) if lit else (120, 90, 200, 170)
+            col = (255, 170, 90, 230) if lit else (140, 112, 82, 170)
             pygame.draw.rect(bg, col, (int(i * bw) + 1, int(mid - h), max(1, int(bw) - 2), 2 * h), border_radius=2)
         gy = int(box.h * 0.8)
         for i in range(5):
@@ -611,11 +611,11 @@ class ImportScene(Scene):
             pygame.draw.circle(bg, (*c, 255), (gx, gy), r)
             pygame.draw.circle(bg, (255, 255, 255, 120 + int(120 * pulse)), (gx, gy), max(3, r // 3))
         surf.blit(bg, box.topleft)
-        pygame.draw.rect(surf, (140, 100, 220), box, 2, border_radius=12)
+        pygame.draw.rect(surf, (156, 122, 84), box, 2, border_radius=12)
         y += 5 * row_h + 14
         # ilerleme cubugu
         bar = pygame.Rect(x, y, panel.w - 60, 26)
-        pygame.draw.rect(surf, (30, 24, 54), bar, border_radius=13)
+        pygame.draw.rect(surf, (40, 35, 30), bar, border_radius=13)
         frac = cur.progress
         if frac > 0:
             fr = bar.copy()
@@ -632,7 +632,7 @@ class ImportScene(Scene):
         y += 34
         if total > 1:
             tot = pygame.Rect(x, y, panel.w - 60, 6)
-            pygame.draw.rect(surf, (30, 24, 54), tot, border_radius=3)
+            pygame.draw.rect(surf, (40, 35, 30), tot, border_radius=3)
             ov = (done + frac) / total
             pygame.draw.rect(surf, NEON_CYAN, (tot.x, tot.y, max(6, int(tot.w * ov)), 6), border_radius=3)
         return y + 18
@@ -651,11 +651,11 @@ class ImportScene(Scene):
             s = pygame.Surface(r.size, pygame.SRCALPHA)
             if i == self.sel:
                 k = 0.5 + 0.5 * math.sin(self.t * 4)
-                pygame.draw.rect(s, (255, 60, 170, 70 + int(40 * k)), (0, 0, *r.size), border_radius=12)
-                pygame.draw.rect(s, (255, 110, 200, 240), (0, 0, *r.size), 2, border_radius=12)
+                pygame.draw.rect(s, (255, 118, 30, 70 + int(40 * k)), (0, 0, *r.size), border_radius=12)
+                pygame.draw.rect(s, (255, 176, 72, 240), (0, 0, *r.size), 2, border_radius=12)
             else:
-                pygame.draw.rect(s, (20, 16, 40, 200), (0, 0, *r.size), border_radius=12)
-                pygame.draw.rect(s, (110, 90, 160, 200), (0, 0, *r.size), 2, border_radius=12)
+                pygame.draw.rect(s, (28, 24, 21, 200), (0, 0, *r.size), border_radius=12)
+                pygame.draw.rect(s, (124, 104, 82, 200), (0, 0, *r.size), 2, border_radius=12)
             surf.blit(s, r.topleft)
             surf.blit(im, (r.centerx - im.get_width() // 2, r.centery - im.get_height() // 2))
             x += w + 24
@@ -707,10 +707,10 @@ class ConfirmScene(Scene):
             r.center = (W // 2 + (-110 if i == 0 else 110), panel.bottom - 50)
             s = pygame.Surface(r.size, pygame.SRCALPHA)
             if i == self.sel:
-                pygame.draw.rect(s, (255, 60, 170, 90), (0, 0, *r.size), border_radius=12)
-                pygame.draw.rect(s, (255, 110, 200, 240), (0, 0, *r.size), 2, border_radius=12)
+                pygame.draw.rect(s, (255, 118, 30, 90), (0, 0, *r.size), border_radius=12)
+                pygame.draw.rect(s, (255, 176, 72, 240), (0, 0, *r.size), 2, border_radius=12)
             else:
-                pygame.draw.rect(s, (110, 90, 160, 200), (0, 0, *r.size), 2, border_radius=12)
+                pygame.draw.rect(s, (124, 104, 82, 200), (0, 0, *r.size), 2, border_radius=12)
             surf.blit(s, r.topleft)
             surf.blit(img, (r.centerx - img.get_width() // 2, r.centery - img.get_height() // 2))
         draw_hints(surf, self.assets, [("key.leftright", "hint.select"), ("key.enter_green", "hint.ok"),

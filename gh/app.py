@@ -26,6 +26,8 @@ from .settings_store import AppSettings, save_settings
 class App:
     def __init__(self, settings: AppSettings, *, headless: bool = False, audio: bool = True):
         self.settings = settings
+        from .render import ui as _ui
+        _ui.menu_video_enabled = bool(settings.extra.get("bg_video", True)) and not headless
         self.headless = headless
         from . import i18n
         i18n.set_language(settings.extra.get("language") or i18n.default_language())

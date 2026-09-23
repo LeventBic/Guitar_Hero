@@ -83,7 +83,7 @@ class TitleScene(Scene):
         pill = pygame.Rect(0, 0, tag.get_width() + 40, tag.get_height() + 10)
         pill.center = (W // 2, 318 + tag.get_height() // 2)
         ps = pygame.Surface(pill.size, pygame.SRCALPHA)
-        pygame.draw.rect(ps, (8, 4, 24, 210), (0, 0, *pill.size), border_radius=pill.h // 2)
+        pygame.draw.rect(ps, (14, 11, 9, 220), (0, 0, *pill.size), border_radius=pill.h // 2)
         pygame.draw.rect(ps, NEON_CYAN + (160,), (0, 0, *pill.size), 1, border_radius=pill.h // 2)
         surf.blit(ps, pill.topleft)
         surf.blit(tag, (W // 2 - tag.get_width() // 2, 318))

@@ -401,8 +401,8 @@ class PauseScene(Scene):
 
     def draw(self, surf: pygame.Surface) -> None:
         fade_overlay(surf, 170, (6, 4, 16))
-        draw_panel(surf, (W // 2 - 280, 150, 560, 400), border=NEON_PINK, fill=(10, 6, 24, 200))
-        img = self.assets.text.glow(t("pause.title"), 72, (255, 120, 210), glow_color=NEON_PINK)
+        draw_panel(surf, (W // 2 - 280, 150, 560, 400), border=NEON_PINK, fill=(14, 13, 11, 200))
+        img = self.assets.text.glow(t("pause.title"), 72, (255, 204, 124), glow_color=NEON_PINK)
         surf.blit(img, (W // 2 - img.get_width() // 2, 170))
         sub = self.assets.text.render(f"{self.game.title}  -  {self.game.artist}", 22, TEXT_DIM)
         surf.blit(sub, (W // 2 - sub.get_width() // 2, 262))

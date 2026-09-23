@@ -105,40 +105,49 @@ class HighwayRenderer:
             return [(x + off[0], y + off[1]) for x, y in pts]
 
         zn, zf = Z_NEAR, pr.z_far
-        # zemin: koyu degrade (uzak: daha koyu)
+        # zemin: koyu gul agaci sap (uzak: daha koyu)
         poly = sh(self._poly(-RAIL_P, RAIL_P, zn, zf))
-        grad = vertical_gradient((W, h), (10, 10, 18, 255), (34, 30, 48, 255), alpha=True)
+        grad = vertical_gradient((W, h), (16, 9, 6, 255), (62, 36, 22, 255), alpha=True)
         mask = pygame.Surface((W, h), pygame.SRCALPHA)
         pygame.draw.polygon(mask, (255, 255, 255, 255), poly)
         grad.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
         board.blit(grad, (0, 0))
-        # doku: kaybolma noktasina yakinsayan ince damarlar
+        # ahsap damarlari: kaybolma noktasina yakinsayan, dalgali koyu / acik seritler
         rng = random.Random(3)
-        for _ in range(140):
-            p = rng.uniform(-0.98, 0.98)
-            c = rng.randint(-10, 12)
-            col = (max(0, 24 + c), max(0, 22 + c), max(0, 34 + c))
-            a = sh([(pr.x(p, zn), pr.y(zn)), (pr.x(p, zf), pr.y(zf))])
-            pygame.draw.line(board, col, a[0], a[1], 1)
-        # serit bolucu cizgiler
+        grain = pygame.Surface((W, h), pygame.SRCALPHA)
+        for _ in range(260):
+            p = rng.uniform(-0.99, 0.99)
+            dark = rng.random() < 0.6
+            a = rng.randint(18, 60)
+            col = (0, 0, 0, a) if dark else (120, 76, 44, a // 2)
+            wob = rng.uniform(-0.03, 0.03)
+            pts = []
+            for k in range(9):
+                z = zn + (zf - zn) * k / 8
+                pts.append((pr.x(p + wob * math.sin(k * 1.3 + p * 9), z), pr.y(z)))
+            pygame.draw.lines(grain, col, False, sh(pts), rng.choice((1, 1, 2)))
+        grain.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        board.blit(grain, (0, 0))
+        # teller (serit bolucu): koyu golge + gumus tel
         for p in (-0.6, -0.2, 0.2, 0.6):
             a = sh([(pr.x(p, zn), pr.y(zn)), (pr.x(p, zf), pr.y(zf))])
-            pygame.draw.line(board, (70, 70, 92), a[0], a[1], 2)
-            pygame.draw.aaline(board, (110, 110, 140), a[0], a[1])
-        # yan raylar (metalik) + ic golge
+            pygame.draw.line(board, (10, 6, 4), (a[0][0] + 2, a[0][1]), (a[1][0] + 1, a[1][1]), 3)
+            pygame.draw.line(board, (128, 122, 114), a[0], a[1], 2)
+            pygame.draw.aaline(board, (214, 208, 196), a[0], a[1])
+        # yan raylar (krom) + ic golge
         for sgn in (-1, 1):
             outer = sh(self._poly(sgn * 1.0, sgn * 1.075, zn, zf))
-            pygame.draw.polygon(board, (150, 150, 170), outer)
+            pygame.draw.polygon(board, (128, 122, 116), outer)
             inner = sh(self._poly(sgn * 1.0, sgn * 1.03, zn, zf))
-            pygame.draw.polygon(board, (225, 225, 240), inner)
+            pygame.draw.polygon(board, (236, 230, 220), inner)
             edge = sh([(pr.x(sgn * 1.075, zn), pr.y(zn)), (pr.x(sgn * 1.075, zf), pr.y(zf))])
-            pygame.draw.aaline(board, (60, 60, 80), edge[0], edge[1])
-            shade = sh(self._poly(sgn * 0.93, sgn * 1.0, zn, zf))
+            pygame.draw.aaline(board, (40, 34, 30), edge[0], edge[1])
+            shade = sh(self._poly(sgn * 0.9, sgn * 1.0, zn, zf))
             sshade = pygame.Surface((W, h), pygame.SRCALPHA)
-            pygame.draw.polygon(sshade, (0, 0, 0, 90), shade)
+            pygame.draw.polygon(sshade, (0, 0, 0, 110), shade)
             board.blit(sshade, (0, 0))
             # kenar yumusatma (poligon kenarlari)
-            for p, col in ((1.075, (120, 120, 140)), (1.03, (200, 200, 215)), (1.0, (150, 150, 168))):
+            for p, col in ((1.075, (104, 98, 92)), (1.03, (210, 204, 194)), (1.0, (150, 142, 132))):
                 a = sh([(pr.x(sgn * p, zn), pr.y(zn)), (pr.x(sgn * p, zf), pr.y(zf))])
                 pygame.draw.aaline(board, col, a[0], a[1])
         self.board = board.convert_alpha()
@@ -324,20 +333,25 @@ class HighwayRenderer:
             y = pr.hor + (STRIKE_Y - pr.hor) * s
             x0 = CX - HW * s * 0.995
             x1 = CX + HW * s * 0.995
+            # perde telleri: olcu = kalin gumus (ust isik + alt golge), vurus = ince, yarim = koyu ahsap cizgi
             if k == 0:
-                col = (150, 150, 185)
-                th = max(1, int(5 * s))
+                col = (196, 190, 178)
+                th = max(2, int(6 * s))
             elif k == 1:
-                col = (88, 88, 118)
+                col = (124, 116, 104)
                 th = max(1, int(3 * s))
             else:
                 if s < 0.45:
                     continue
-                col = (46, 46, 64)
+                col = (44, 26, 16)
                 th = 1
             if st.engine.sp_active:
                 col = lerp_color(col, (80, 170, 255), 0.5)
+            if k <= 1 and th >= 2:
+                pygame.draw.line(surf, (8, 5, 3), (x0, y + th * 0.6), (x1, y + th * 0.6), th)
             pygame.draw.line(surf, col, (x0, y), (x1, y), th)
+            if k == 0 and th >= 3:
+                pygame.draw.line(surf, (250, 246, 236), (x0, y - th // 3), (x1, y - th // 3), 1)
 
     def _draw_strike_bar(self, surf, st) -> None:
         pr = self.proj

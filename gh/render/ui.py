@@ -1,4 +1,4 @@
-"""Menu arayuzu yardimcilari: neon arka planlar, menu listesi, paneller, yildizlar, ipucu cubugu."""
+"""Menu arayuzu yardimcilari: sahne / video arka planlari, menu listesi, metal paneller, yildizlar, ipucu cubugu."""
 from __future__ import annotations
 
 import math
@@ -8,71 +8,119 @@ import pygame
 
 from ..i18n import t
 from .assets import (BG_BOTTOM, BG_TOP, GOLD, NEON_CYAN, NEON_PINK, NEON_PURPLE, TEXT_DIM, W,
-                     blur_surface, lerp_color, lighten, radial_glow, scale_color, star_points, vertical_gradient)
+                     blur_surface, lerp_color, lighten, metal_panel, radial_glow, scale_color, star_points,
+                     vertical_gradient)
 
 H = 720
 
 
+# menu videosu (Ayarlar -> Arka plan videosu); App ve ayarlar sahnesi gunceller
+menu_video_enabled = True
+
+
 class SynthBackground:
-    """Menu arka plani: degrade gok, cizgili gunes, kayan perspektif izgara, yildizlar."""
+    """Menu arka plani (rock sahnesi): karartilmis gitarist klibi - tum menulerde kesintisiz tek oynatici -
+    video yoksa spot isikli, sisli koyu sahne. (Ad eski synthwave temasindan kalma; API ayni.)"""
+
+    _video = None
+    _video_t0 = 0.0
+    _video_tried = False
 
     def __init__(self):
         self.t = 0.0
-        sky = vertical_gradient((W, H), (6, 4, 20), (40, 10, 60))
-        # gunes
-        sun_r = 150
-        sun = pygame.Surface((sun_r * 2, sun_r * 2), pygame.SRCALPHA)
-        grad = vertical_gradient((sun_r * 2, sun_r * 2), (255, 220, 90, 255), (255, 40, 150, 255), alpha=True)
-        mask = pygame.Surface((sun_r * 2, sun_r * 2), pygame.SRCALPHA)
-        pygame.draw.circle(mask, (255, 255, 255, 255), (sun_r, sun_r), sun_r)
-        for i in range(7):
-            y = sun_r + 20 + i * 18
-            pygame.draw.rect(mask, (0, 0, 0, 0), (0, y, sun_r * 2, 3 + i * 1.6))
-        grad.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-        glow = radial_glow(sun_r + 90, (120, 30, 90), 1.6)
-        self.horizon = 430
-        sky.blit(glow, (W // 2 - glow.get_width() // 2, self.horizon - 120 - glow.get_height() // 2 + 40),
-                 special_flags=pygame.BLEND_ADD)
-        sky.blit(grad, (W // 2 - sun_r, self.horizon - sun_r - 110))
-        # daglar
-        rng = random.Random(5)
-        pts = [(0, self.horizon)]
-        x = 0
-        while x < W:
-            x += rng.randint(40, 90)
-            pts.append((x, self.horizon - rng.randint(10, 70)))
-        pts += [(W, self.horizon), (W, H), (0, H)]
-        pygame.draw.polygon(sky, (16, 6, 34), pts)
-        pygame.draw.lines(sky, (120, 40, 160), False, pts[:-3], 2)
-        floor = vertical_gradient((W, H - self.horizon), (22, 6, 40), (8, 2, 18))
-        sky.blit(floor, (0, self.horizon))
-        # yildizlar
-        for _ in range(140):
-            x, y = rng.randint(0, W), rng.randint(0, self.horizon - 60)
-            c = rng.randint(90, 220)
-            sky.set_at((x, y), (c, c, min(255, c + 30)))
-        self.base = sky.convert()
-        self.hglow = radial_glow(80, (255, 60, 170), 1.5).convert()
+        base = vertical_gradient((W, H), (5, 4, 4), (30, 14, 8))
+        floor = radial_glow(520, (70, 30, 10), 1.6)
+        base.blit(pygame.transform.smoothscale(floor, (1600, 420)), (W // 2 - 800, H - 250),
+                  special_flags=pygame.BLEND_ADD)
+        self.base = base.convert()
+        # spot huzmeleri: sicak beyaz / kehribar, 3 yogunluk seviyesi
+        self.beams = []
+        for x, col, ang in ((170, (255, 170, 80), 0.32), (470, (255, 235, 200), 0.1),
+                            (810, (255, 235, 200), -0.1), (1110, (255, 170, 80), -0.32)):
+            cone = self._cone(col, ang)
+            self.beams.append((x, [self._scaled(cone, k) for k in (0.45, 0.7, 1.0)]))
+        # sis bulutlari (yavas kayan, toplamali)
+        rng = random.Random(11)
+        self.smoke = []
+        for _ in range(5):
+            g = radial_glow(rng.randint(160, 260), (34, 26, 22), 1.2)
+            g = pygame.transform.smoothscale(g, (g.get_width() * 2, g.get_height())).convert()
+            self.smoke.append((g, rng.uniform(0, W), rng.uniform(H * 0.35, H * 0.8), rng.uniform(8, 22)))
+        # vinyet (kenarlar koyu, alt kisim sicak)
+        vig = pygame.Surface((W, H), pygame.SRCALPHA)
+        for i in range(24):
+            k = i / 24
+            pygame.draw.rect(vig, (0, 0, 0, int(150 * (1 - k) ** 2)), (int(k * 120), int(k * 70),
+                             W - int(k * 240), H - int(k * 140)), 6)
+        self.vignette = vig.convert_alpha()
+        self.dim = pygame.Surface((W, H))
+        self._ensure_video()
+
+    @staticmethod
+    def _scaled(img, k):
+        s = img.copy()
+        m = pygame.Surface(s.get_size())
+        v = int(255 * k)
+        m.fill((v, v, v))
+        s.blit(m, (0, 0), special_flags=pygame.BLEND_MULT)
+        return s.convert()
+
+    @staticmethod
+    def _cone(color, ang):
+        w, h = 380, 620
+        s = pygame.Surface((w, h))
+        s.fill((0, 0, 0))
+        for k in range(22):
+            t = k / 22
+            half = 10 + t * 160
+            c = scale_color(color, 0.016 * (1 - t) + 0.004)
+            tmp = pygame.Surface((w, h))
+            tmp.fill((0, 0, 0))
+            pygame.draw.polygon(tmp, c, [(w / 2 - 5, 0), (w / 2 + 5, 0), (w / 2 + half, h), (w / 2 - half, h)])
+            s.blit(tmp, (0, 0), special_flags=pygame.BLEND_ADD)
+        return pygame.transform.rotate(blur_surface(s, 8), math.degrees(ang))
+
+    @classmethod
+    def _ensure_video(cls) -> None:
+        if cls._video is not None or cls._video_tried or not menu_video_enabled:
+            return
+        cls._video_tried = True
+        try:
+            import time as _time
+
+            from ..video import VideoPlayer, available, stock_clips
+            clips = stock_clips()
+            if clips and available():
+                cls._video = VideoPlayer(random.choice(clips), (W, H), loop=True)
+                cls._video_t0 = _time.perf_counter()
+        except Exception:
+            cls._video = None
 
     def update(self, dt: float) -> None:
         self.t += dt
 
     def draw(self, surf: pygame.Surface, pulse: float = 0.0) -> None:
-        surf.blit(self.base, (0, 0))
-        hz = self.horizon
-        col = lerp_color((150, 40, 170), (255, 90, 200), pulse)
-        # yatay cizgiler (kayan)
-        phase = (self.t * 0.6) % 1.0
-        for i in range(18):
-            k = (i + phase) / 18
-            y = hz + (H - hz) * (k ** 2.2)
-            c = lerp_color((40, 10, 60), col, min(1.0, k * 1.6))
-            pygame.draw.line(surf, c, (0, y), (W, y), 1 if k < 0.4 else 2)
-        for i in range(-16, 17):
-            x_far = W / 2 + i * 22
-            x_near = W / 2 + i * 150
-            pygame.draw.line(surf, lerp_color((40, 10, 60), col, 0.7), (x_far, hz), (x_near, H), 1)
-        pygame.draw.line(surf, (255, 120, 220), (0, hz), (W, hz), 2)
+        frame = None
+        v = SynthBackground._video
+        if v is not None and menu_video_enabled:
+            import time as _time
+            frame = v.frame(_time.perf_counter() - SynthBackground._video_t0)
+        if frame is not None:
+            surf.blit(frame, (0, 0))
+            k = int(70 + 14 * pulse)
+            self.dim.fill((k + 8, k, k - 6))                     # karart + sicak ton
+            surf.blit(self.dim, (0, 0), special_flags=pygame.BLEND_MULT)
+        else:
+            surf.blit(self.base, (0, 0))
+            for g, x0, y, speed in self.smoke:
+                x = (x0 + self.t * speed) % (W + g.get_width()) - g.get_width()
+                surf.blit(g, (x, y - g.get_height() // 2), special_flags=pygame.BLEND_ADD)
+        for i, (x, levels) in enumerate(self.beams):
+            sway = math.sin(self.t * 0.35 + i * 1.7) * 18
+            lvl = 2 if pulse > 0.66 else 1 if pulse > 0.2 else 0
+            img = levels[lvl if frame is None else max(0, lvl - 1)]
+            surf.blit(img, (x + sway - img.get_width() // 2, -60), special_flags=pygame.BLEND_ADD)
+        surf.blit(self.vignette, (0, 0))
 
 
 class StageBackground:
@@ -91,7 +139,7 @@ class StageBackground:
             except Exception:
                 pass
         # sahne zemini parlamasi
-        g = radial_glow(420, (40, 18, 70), 1.3)
+        g = radial_glow(420, (47, 41, 35), 1.3)
         base.blit(pygame.transform.smoothscale(g, (1400, 500)), (W // 2 - 700, 420), special_flags=pygame.BLEND_ADD)
         self.base = base.convert()
         # isik huzmeleri (toplamali, 3 yogunluk)
@@ -152,12 +200,11 @@ class StageBackground:
 
 # --------------------------------------------------------------------------- widget'lar
 
-def draw_panel(surf, rect, border=NEON_PURPLE, fill=(12, 10, 28, 215), radius=16, width=2):
+def draw_panel(surf, rect, border=NEON_PURPLE, fill=(18, 16, 14, 215), radius=12, width=2):
+    """Metal plaka panel (fill'in yalniz alfa degeri kullanilir: seffaflik)."""
     r = pygame.Rect(rect)
-    s = pygame.Surface(r.size, pygame.SRCALPHA)
-    pygame.draw.rect(s, fill, (0, 0, *r.size), border_radius=radius)
-    pygame.draw.rect(s, border + (230,), (0, 0, *r.size), width, border_radius=radius)
-    surf.blit(s, r.topleft)
+    alpha = fill[3] if len(fill) > 3 else 232
+    surf.blit(metal_panel(r.size, border, radius, min(245, alpha + 20), width), r.topleft)
 
 
 class MenuList:
@@ -191,8 +238,8 @@ class MenuList:
         bar.centery = int(self._bar_y)
         s = pygame.Surface(bar.size, pygame.SRCALPHA)
         k = 0.5 + 0.5 * math.sin(self.t * 4)
-        pygame.draw.rect(s, (255, 60, 170, 60 + int(30 * k)), (0, 0, *bar.size), border_radius=12)
-        pygame.draw.rect(s, (255, 90, 190, 220), (0, 0, *bar.size), 2, border_radius=12)
+        pygame.draw.rect(s, (255, 118, 30, 60 + int(30 * k)), (0, 0, *bar.size), border_radius=12)
+        pygame.draw.rect(s, (255, 176, 72, 220), (0, 0, *bar.size), 2, border_radius=12)
         surf.blit(s, bar.topleft)
         for i, key in enumerate(self.items):
             it = t(key)            # ogeler i18n anahtari (ya da duz metin); cizimde cevrilir
@@ -217,7 +264,7 @@ def draw_star(surf, center, r, filled: bool, color=GOLD, outline=(255, 250, 220)
         pygame.draw.polygon(surf, lighten(color, 0.5), star_points(center[0], center[1] - r * 0.08, r * 0.55, r * 0.25))
         pygame.draw.polygon(surf, outline, pts, 2)
     else:
-        pygame.draw.polygon(surf, (40, 36, 60), pts)
+        pygame.draw.polygon(surf, (50, 44, 38), pts)
         pygame.draw.polygon(surf, (90, 86, 120), pts, 2)
 
 
@@ -227,17 +274,17 @@ def draw_hints(surf, assets, hints: list[tuple[str, str]], y: int = 690) -> None
     parts = []
     total = 0
     for key, desc in hints:
-        k = tc.render(t(key), 16, (20, 16, 30), "ui", True)
+        k = tc.render(t(key), 16, (26, 20, 14), "ui", True)
         d = tc.render(t(desc), 16, TEXT_DIM, "ui")
         parts.append((k, d))
         total += k.get_width() + 14 + 8 + d.get_width() + 28
     strip = pygame.Surface((W, 36), pygame.SRCALPHA)
-    strip.fill((4, 2, 12, 225))
+    strip.fill((10, 8, 6, 232))
     surf.blit(strip, (0, y - 8))
     x = W // 2 - total // 2
     for k, d in parts:
         r = pygame.Rect(x, y - 2, k.get_width() + 14, 22)
-        pygame.draw.rect(surf, (200, 200, 225), r, border_radius=5)
+        pygame.draw.rect(surf, (222, 212, 194), r, border_radius=5)
         surf.blit(k, (x + 7, y))
         x = r.right + 8
         surf.blit(d, (x, y))
@@ -254,7 +301,7 @@ def fade_overlay(surf, alpha: int, color=(0, 0, 0)) -> None:
 
 
 def draw_title_logo(surf, assets, center, size=150, t=0.0) -> None:
-    img = assets.text.glow("RIFF", size, (255, 110, 200), "title", True, glow_color=(255, 40, 160), radius=16)
+    img = assets.text.glow("RIFF", size, (255, 206, 120), "title", True, glow_color=(255, 90, 20), radius=16)
     x = center[0] - img.get_width() // 2
     y = center[1] - img.get_height() // 2
     surf.blit(img, (x, y))

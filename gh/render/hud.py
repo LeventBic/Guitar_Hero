@@ -7,7 +7,7 @@ import math
 import pygame
 
 from ..i18n import t
-from .assets import (NEON_CYAN, NEON_ORANGE, NEON_PINK, SP_BLUE, TEXT, TEXT_DIM, W, lerp_color,
+from .assets import (NEON_CYAN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, SP_BLUE, TEXT, TEXT_DIM, W, lerp_color,
                      lighten, radial_glow, scale_color)
 
 MULT_COLORS = {1: (205, 205, 220), 2: (255, 165, 40), 3: (80, 230, 110), 4: (190, 100, 255)}
@@ -20,16 +20,10 @@ GAUGE_C = (1112, 628)
 GAUGE_R = 96
 
 
-def _rounded_panel(size, radius=16, fill=(12, 10, 26, 205), border=(120, 90, 220), bw=2) -> pygame.Surface:
-    w, h = size
-    s = pygame.Surface((w, h), pygame.SRCALPHA)
-    pygame.draw.rect(s, fill, (0, 0, w, h), border_radius=radius)
-    pygame.draw.rect(s, border + (230,), (0, 0, w, h), bw, border_radius=radius)
-    hl = pygame.Surface((w, h // 2), pygame.SRCALPHA)
-    pygame.draw.rect(hl, (255, 255, 255, 14), (0, 0, w, h // 2), border_top_left_radius=radius,
-                     border_top_right_radius=radius)
-    s.blit(hl, (0, 0))
-    return s
+def _rounded_panel(size, radius=12, fill=(12, 10, 26, 205), border=NEON_PURPLE, bw=2) -> pygame.Surface:
+    """HUD plakasi: firca izli metal (assets.metal_panel)."""
+    from .assets import metal_panel
+    return metal_panel(size, border, radius, min(245, fill[3] + 25), bw).copy()
 
 
 def _arc_poly(cx, cy, r0, r1, a0, a1, steps=16):
@@ -65,13 +59,13 @@ class HUD:
 
     # ------------------------------------------------------------------ onceden cizim
     def _build(self) -> None:
-        self.panel_left = _rounded_panel((300, 196), border=(255, 60, 170))
-        self.panel_right = _rounded_panel((300, 196), border=(60, 200, 255))
+        self.panel_left = _rounded_panel((300, 196), border=NEON_PINK)
+        self.panel_right = _rounded_panel((300, 196), border=NEON_CYAN)
         # carpan halkasi segmentleri
         self.seg = {}
         colors = dict(MULT_COLORS)
         colors["sp"] = SP_MULT_COLOR
-        colors["off"] = (38, 36, 56)
+        colors["off"] = (48, 42, 36)
         big = (ORB_R + 20) * 2 * SS
         for key, col in colors.items():
             segs = []
@@ -274,7 +268,7 @@ class HUD:
         needle = [(base_pt[0] + perp[0], base_pt[1] + perp[1]), tip, (base_pt[0] - perp[0], base_pt[1] - perp[1])]
         pygame.draw.polygon(surf, (20, 20, 26), [(x + 2, y + 2) for x, y in needle])
         pygame.draw.polygon(surf, (250, 250, 255), needle)
-        pygame.draw.circle(surf, (60, 60, 80), GAUGE_C, 10)
+        pygame.draw.circle(surf, (74, 65, 56), GAUGE_C, 10)
         pygame.draw.circle(surf, (200, 200, 220), GAUGE_C, 10, 2)
         lab = a.text.render(t("hud.rock_meter") if st.rock_active else t("hud.no_fail"), 14, TEXT_DIM, "ui", True)
         surf.blit(lab, (GAUGE_C[0] - lab.get_width() // 2, GAUGE_C[1] + 14))
@@ -295,7 +289,7 @@ class HUD:
         seg_w = (bw - 9) / 4
         for i in range(4):
             sx = x0 + i * (seg_w + 3)
-            pygame.draw.rect(surf, (30, 34, 56), (sx, y0, seg_w, bh), border_radius=4)
+            pygame.draw.rect(surf, (44, 39, 33), (sx, y0, seg_w, bh), border_radius=4)
             fill = max(0.0, min(1.0, sp * 4 - i))
             if fill > 0:
                 if eng.sp_active:
@@ -313,14 +307,14 @@ class HUD:
     def _draw_progress(self, surf, st) -> None:
         a = self.a
         x0, y0, w = 390, 12, 500
-        pygame.draw.rect(surf, (20, 18, 36), (x0 - 2, y0 - 2, w + 4, 10), border_radius=5)
+        pygame.draw.rect(surf, (27, 24, 20), (x0 - 2, y0 - 2, w + 4, 10), border_radius=5)
         prog = 0.0 if st.song_length <= 0 else max(0.0, min(1.0, st.visual_time / st.song_length))
-        pygame.draw.rect(surf, (40, 36, 70), (x0, y0, w, 6), border_radius=3)
+        pygame.draw.rect(surf, (54, 47, 40), (x0, y0, w, 6), border_radius=3)
         if prog > 0:
             pygame.draw.rect(surf, lerp_color(NEON_PINK, NEON_CYAN, prog), (x0, y0, max(3, int(w * prog)), 6),
                              border_radius=3)
         for sx in st.section_marks:
-            pygame.draw.line(surf, (120, 110, 170), (x0 + int(w * sx), y0 - 2), (x0 + int(w * sx), y0 + 7), 1)
+            pygame.draw.line(surf, (140, 128, 110), (x0 + int(w * sx), y0 - 2), (x0 + int(w * sx), y0 + 7), 1)
         t = max(0.0, st.visual_time)
         ts = a.text.render(f"{int(t // 60)}:{int(t % 60):02d}", 14, TEXT_DIM, "ui")
         surf.blit(ts, (x0 - ts.get_width() - 10, y0 - 5))
@@ -350,7 +344,7 @@ class HUD:
         if not self.settings.extra.get("show_timing", True):
             return
         cx, y, half = W // 2, 704, 110
-        pygame.draw.line(surf, (70, 66, 100), (cx - half, y), (cx + half, y), 2)
+        pygame.draw.line(surf, (88, 77, 66), (cx - half, y), (cx + half, y), 2)
         pygame.draw.line(surf, (200, 200, 220), (cx, y - 7), (cx, y + 7), 2)
         for k in (-1, 1):
             pygame.draw.line(surf, (90, 86, 120), (cx + k * half, y - 5), (cx + k * half, y + 5), 1)
@@ -377,7 +371,7 @@ class HUD:
         a = self.a
         r = pygame.Rect(958, 250, 200, 118)
         box = pygame.Surface(r.size, pygame.SRCALPHA)
-        pygame.draw.rect(box, (14, 10, 30, 215), (0, 0, *r.size), border_radius=14)
+        pygame.draw.rect(box, (20, 17, 15, 215), (0, 0, *r.size), border_radius=14)
         pygame.draw.rect(box, NEON_ORANGE + (255,), (0, 0, *r.size), 2, border_radius=14)
         surf.blit(box, r.topleft)
         ti = a.text.render(t("hud.solo"), 18, NEON_ORANGE, "ui", True)

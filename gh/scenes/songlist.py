@@ -177,7 +177,7 @@ class SongListScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 14, 150))
         surf.blit(shade, (0, 0))
-        head = tc.glow(t("songs.title"), 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
+        head = tc.glow(t("songs.title"), 42, (255, 214, 140), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (40, 14))
         cnt = tc.render(t("songs.count", n=len(self.songs)), 18, TEXT_DIM)
         surf.blit(cnt, (620 - cnt.get_width(), 38))
@@ -209,8 +209,8 @@ class SongListScene(Scene):
             if sel:
                 k = 0.5 + 0.5 * math.sin(self.t * 4)
                 hl = pygame.Surface(row.size, pygame.SRCALPHA)
-                pygame.draw.rect(hl, (255, 60, 170, 70 + int(30 * k)), (0, 0, *row.size), border_radius=10)
-                pygame.draw.rect(hl, (255, 100, 200, 230), (0, 0, *row.size), 2, border_radius=10)
+                pygame.draw.rect(hl, (255, 118, 30, 70 + int(30 * k)), (0, 0, *row.size), border_radius=10)
+                pygame.draw.rect(hl, (255, 176, 72, 230), (0, 0, *row.size), 2, border_radius=10)
                 surf.blit(hl, row.topleft)
             n = tc.render(s.name, 24, (255, 255, 255) if sel else TEXT, "ui", True)
             ar = tc.render(s.artist, 16, NEON_CYAN if sel else TEXT_DIM)
@@ -236,8 +236,8 @@ class SongListScene(Scene):
         if art is not None:
             surf.blit(art, (ax, ay))
         else:
-            pygame.draw.rect(surf, (30, 26, 50), (ax, ay, 250, 250), border_radius=8)
-            q = tc.glow("RIFF", 60, (255, 110, 200), glow_color=NEON_PINK)
+            pygame.draw.rect(surf, (39, 34, 29), (ax, ay, 250, 250), border_radius=8)
+            q = tc.glow("RIFF", 60, (255, 206, 120), glow_color=NEON_PINK)
             surf.blit(q, (ax + 125 - q.get_width() // 2, ay + 125 - q.get_height() // 2))
         pygame.draw.rect(surf, (200, 200, 230), (ax - 2, ay - 2, 254, 254), 2, border_radius=4)
         tx = ax + 272
@@ -272,7 +272,7 @@ class SongListScene(Scene):
             l = tc.render(t("songs.intensity"), 14, TEXT_DIM, "ui", True)
             surf.blit(l, (tx, y + 3))
             for k in range(6):
-                c = NEON_ORANGE if k < s.diff_guitar else (50, 46, 70)
+                c = NEON_ORANGE if k < s.diff_guitar else (61, 54, 46)
                 pygame.draw.circle(surf, c, (tx + max(90, lab_w + 10) + k * 20, y + 11), 7)
         # zorluklar
         y2 = ay + 280
@@ -282,7 +282,7 @@ class SongListScene(Scene):
         x = ax
         for d in DIFFICULTIES:
             have = d in self.diffs
-            col = DIFF_COLORS[d] if have else (60, 56, 80)
+            col = DIFF_COLORS[d] if have else (73, 64, 54)
             chip = tc.render(upper(diff_name(d)), 18, (15, 12, 25) if have else (100, 96, 120), "ui", True)
             r = pygame.Rect(x, y2, chip.get_width() + 24, 32)
             pygame.draw.rect(surf, col, r, border_radius=16)
@@ -370,7 +370,7 @@ class DifficultyScene(Scene):
         # yukleme ekrani bir frame goster
         surf = self.app.screen
         fade_overlay(surf, 200, (4, 2, 12))
-        img = self.assets.text.glow(t("diffsel.loading"), 48, (255, 130, 215), glow_color=NEON_PINK)
+        img = self.assets.text.glow(t("diffsel.loading"), 48, (255, 214, 140), glow_color=NEON_PINK)
         surf.blit(img, (W // 2 - img.get_width() // 2, 330))
         if not self.app.headless:
             pygame.display.flip()
@@ -402,13 +402,13 @@ class DifficultyScene(Scene):
             sel = i == self.index
             if kind == "opt" and self.rows[i - 1][0] == "diff":
                 y += 16
-                pygame.draw.line(surf, (70, 60, 110), (panel.x + 40, y - 10), (panel.right - 40, y - 10), 1)
+                pygame.draw.line(surf, (89, 78, 67), (panel.x + 40, y - 10), (panel.right - 40, y - 10), 1)
             r = pygame.Rect(panel.x + 30, y, panel.w - 60, 46)
             if sel:
                 k = 0.5 + 0.5 * math.sin(self.t * 5)
                 hl = pygame.Surface(r.size, pygame.SRCALPHA)
-                pygame.draw.rect(hl, (255, 60, 170, 60 + int(40 * k)), (0, 0, *r.size), border_radius=10)
-                pygame.draw.rect(hl, (255, 100, 200, 230), (0, 0, *r.size), 2, border_radius=10)
+                pygame.draw.rect(hl, (255, 118, 30, 60 + int(40 * k)), (0, 0, *r.size), border_radius=10)
+                pygame.draw.rect(hl, (255, 176, 72, 230), (0, 0, *r.size), 2, border_radius=10)
                 surf.blit(hl, r.topleft)
             if kind == "diff":
                 col = DIFF_COLORS[val]

@@ -89,7 +89,7 @@ class ResultsScene(Scene):
         shade.fill((4, 2, 12, 140))
         surf.blit(shade, (0, 0))
         head = t("res.failed") if s["failed"] else (t("res.fc") if s["fc"] else t("res.complete"))
-        col = (255, 90, 100) if s["failed"] else (GOLD if s["fc"] else (255, 120, 210))
+        col = (255, 90, 100) if s["failed"] else (GOLD if s["fc"] else (255, 204, 124))
         img = tc.glow(head, 58, col, glow_color=col)
         surf.blit(img, (W // 2 - img.get_width() // 2, 18))
         bot = "  " + t("common.bot") if s["autoplay"] else ""
@@ -139,7 +139,7 @@ class ResultsScene(Scene):
             v = tc.render(val, 26, TEXT, "ui", True)
             surf.blit(l, (100, y))
             surf.blit(v, (580 - v.get_width(), y))
-            pygame.draw.line(surf, (50, 44, 80), (100, y + 36), (580, y + 36), 1)
+            pygame.draw.line(surf, (64, 56, 48), (100, y + 36), (580, y + 36), 1)
             y += 49
 
         # sag panel: histogram
@@ -162,7 +162,7 @@ class ResultsScene(Scene):
             if h > 0:
                 pygame.draw.rect(surf, colr, r, border_radius=3)
                 pygame.draw.rect(surf, lighten(colr, 0.4), (r.x, r.y, r.w, 3), border_radius=2)
-        pygame.draw.line(surf, (120, 116, 160), (hx, hy + hh), (hx + hw, hy + hh), 2)
+        pygame.draw.line(surf, (140, 128, 110), (hx, hy + hh), (hx + hw, hy + hh), 2)
         zero_x = hx + hw / 2
         pygame.draw.line(surf, (200, 200, 220), (zero_x, hy - 4), (zero_x, hy + hh + 6), 1)
         med_x = hx + hw * (self.median + HIST_RANGE) / (2 * HIST_RANGE)
