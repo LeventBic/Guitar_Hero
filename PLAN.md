@@ -5,7 +5,7 @@ Hedef: Guitar Hero / Clone Hero'nun **gitar + nota mekaniğini** birebir kopyala
 Yığın: Python 3.14 + pygame-ce + numpy + PyInstaller (Unity sapması için bkz. `docs/KARARLAR.md` D01).
 Mimari ve modül sözleşmeleri: `docs/ARCHITECTURE.md`.
 
-Durum: `[x]` bitti · `[x]` devam ediyor · `[ ]` bekliyor · (A/B/C/D = alt ajan)
+Durum: `[x]` bitti · `[~]` devam ediyor · `[ ]` bekliyor · (A/B/C/D = alt ajan)
 
 ## Faz 0 — Ortam
 - [x] `guitarhero/` + `.venv` (pygame-ce 2.5.8, numpy, pyinstaller 6.22, pytest, soundfile)
