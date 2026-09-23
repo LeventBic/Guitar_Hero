@@ -125,7 +125,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "set.samples": {"en": "{n} samples", "tr": "{n} örnek"},
     "set.video_offset": {"en": "Video offset", "tr": "Görüntü gecikmesi"},
     "set.fullscreen": {"en": "Fullscreen", "tr": "Tam ekran"},
-    "set.debug": {"en": "Show FPS / debug (F3)", "tr": "FPS / hata ayıklama (F3)"},
+    "set.debug": {"en": "Show FPS / debug", "tr": "FPS / hata ayıklama"},
     "set.fps_limit": {"en": "FPS limit", "tr": "FPS sınırı"},
     "set.unlimited": {"en": "Unlimited", "tr": "Sınırsız"},
     "set.calibrate": {"en": "Calibrate audio / video", "tr": "Ses / görüntü kalibrasyonu"},

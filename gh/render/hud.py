@@ -1,5 +1,5 @@
 """Oyun ici HUD: skor, carpan kuresi + 10'lu combo halkasi, seri, Star Power bari, rock metre, ilerleme,
-bolum/seri/solo acilir yazilari, erken/gec gostergesi ve F3 debug katmani."""
+bolum/seri/solo acilir yazilari, erken/gec gostergesi ve debug katmani (Ayarlar)."""
 from __future__ import annotations
 
 import math

@@ -127,7 +127,7 @@ class GuitarEngine:
 - Yıldızlar: `base_score × (0.06, 0.12, 0.20, 0.47, 0.78, 1.15)`.
 
 ## Ön yüz notları (Ajan D)
-- **Conductor** (`gh/audio.py`): ana stem (`song.ogg`) `mixer.music` ile, diğer stem'ler ayrılmış kanallarda `Sound`; hepsi aynı çağrıda başlar. Saat `perf_counter` tabanlı ve monoton; `music.get_pos()` (ses callback'i) ile tahmin edilen başlangıcın medyanına yavaşça (dt'nin %5'i) kaydırılır → buffer fazı kaynaklı 0–11 ms rastgele kayma yok, drift F3'te görünür. Kalibrasyon tık izi de aynı yoldan (bellek içi WAV) çalar.
+- **Conductor** (`gh/audio.py`): ana stem (`song.ogg`) `mixer.music` ile, diğer stem'ler ayrılmış kanallarda `Sound`; hepsi aynı çağrıda başlar. Saat `perf_counter` tabanlı ve monoton; `music.get_pos()` (ses callback'i) ile tahmin edilen başlangıcın medyanına yavaşça (dt'nin %5'i) kaydırılır → buffer fazı kaynaklı 0–11 ms rastgele kayma yok, drift debug katmanında görünür (Ayarlar → FPS / hata ayıklama). Kalibrasyon tık izi de aynı yoldan (bellek içi WAV) çalar.
 - **Girdi** (`gh/input.py`): pygame-ce olay zaman damgası vermez; döngü frame'ler arasında ~1 kHz poll eder, olay zamanı = poll aralığının ortası. Girdiler frame beklemeden motora itilir.
 - **Çizim**: 1280×720 mantıksal yüzey, `pygame.SCALED` ile pencereye ölçeklenir (F11 tam ekran). Otoban ayrı bir SRCALPHA katmanda çizilip uzak ucu alfa ile söndürülür; gem/buton/alev sprite'ları önceden çizilip önbelleklenir.
 - **Headless**: `main.py --smoke / --screenshot / --screenshot-menu` simüle saatle çalışır (`gh/headless.py`), `settings.json`'a yazmaz.

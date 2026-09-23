@@ -42,3 +42,14 @@ def test_rebind_to_key_of_other_fret_moves_it(settings_scene):
 def test_translation_format_named_key():
     from gh.i18n import t
     assert "F" in t("set.bound", key="F")          # bicim adi 'key' parametreyle cakismaz
+
+
+def test_f3_is_bindable_and_not_a_global_hotkey(settings_scene):
+    """F3 artik debug kisayolu degil: perde tusu olarak atanabilir, basinca debug katmani degismez."""
+    app, sc = settings_scene
+    press(sc, "fret:0", pygame.K_F3)
+    assert app.settings.keys.frets[0][0] == "f3"
+    before = app.settings.video.show_debug
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F3, mod=0, unicode="", scancode=0))
+    app.poll()
+    assert app.settings.video.show_debug == before

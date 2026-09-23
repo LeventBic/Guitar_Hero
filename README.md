@@ -35,7 +35,7 @@ Kendi şarkıların: Clone Hero formatındaki klasörleri (`notes.chart`/`notes.
 | Star Power | H | Tilt / Back |
 | Whammy | ; | Whammy çubuğu |
 | Duraklat | Enter / Esc | Start |
-| Tam ekran / debug | F11 / F3 | — |
+| Tam ekran | F11 | — |
 
 Menüler: ok tuşları + Enter/Space/Esc veya GH usulü (yeşil = seç, kırmızı = geri, strum = gezin).
 **Ayarlar** (dil, tuş atama, nota hızı, ses/görüntü offset, No Fail, tam ekran): ana menü → AYARLAR, şarkı listesinde **Tab**, oyunda Esc → AYARLAR. Tuş değiştirmek için satırda Enter'a basıp yeni tuşa bas.

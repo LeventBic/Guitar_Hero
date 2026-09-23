@@ -164,7 +164,7 @@ class SettingsScene(Scene):
             return
         if ev.key == pygame.K_ESCAPE:
             self._flash(t("set.cancelled"))
-        elif ev.key in (pygame.K_F3, pygame.K_F11):
+        elif ev.key == pygame.K_F11:
             return
         else:
             name = pygame.key.name(ev.key)

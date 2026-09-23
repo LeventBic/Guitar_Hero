@@ -5,7 +5,7 @@ Ana dongu
 Girdi, frame'lerden bagimsiz olarak ~1 ms aralikla poll edilir (olay zaman damgasi = poll araliginin
 ortasi, bkz. gh.input). Cizim `fps_limit` hizinda (0 = sinirsiz) yapilir; frame'ler arasinda kisa uykularla
 poll surer. Pencere 1280x720 mantiksal cozunurlukte cizilir, SDL (pygame.SCALED) pencereye olcekler;
-F11 tam ekran, pencere yeniden boyutlandirilabilir. F3 debug katmani.
+F11 tam ekran, pencere yeniden boyutlandirilabilir. Debug katmani Ayarlar'dan (FPS / hata ayiklama).
 """
 from __future__ import annotations
 
@@ -245,9 +245,6 @@ class App:
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_F11 or (ev.key == pygame.K_RETURN and ev.mod & pygame.KMOD_ALT):
                     self.toggle_fullscreen()
-                    continue
-                if ev.key == pygame.K_F3:
-                    self.settings.video.show_debug = not self.settings.video.show_debug
                     continue
             inp.process(ev, stamp)
         inp.update(now)
