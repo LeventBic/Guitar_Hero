@@ -1,4 +1,4 @@
-"""Ana menu: animasyonlu neon arka plan, RIFF logosu, Play / Calibration / Settings / Quit."""
+"""Ana menu: sahne / video arka plan, oyun logosu, Play / Import / Calibration / Settings / Quit."""
 from __future__ import annotations
 
 import random
@@ -10,7 +10,7 @@ from ..render.assets import NEON_CYAN, TEXT_DIM, W
 from ..render.ui import MenuList, SynthBackground, draw_hints, draw_title_logo
 from .base import Scene
 
-VERSION = "1.0"
+VERSION = "1.2.0"
 
 
 class TitleScene(Scene):
@@ -18,7 +18,7 @@ class TitleScene(Scene):
         super().__init__(app)
         self.bg = SynthBackground()
         self.menu = MenuList(["title.play", "title.import", "title.calibration", "title.settings", "title.quit"],
-                             W // 2, 400, spacing=52, size=34)
+                             W // 2, 420, spacing=48, size=32)
         rng = random.Random(1)
         self.gems = [[rng.uniform(0, W), rng.uniform(0, 720), rng.uniform(40, 120), rng.randrange(5),
                       rng.uniform(0.5, 1.0)] for _ in range(18)]
@@ -78,15 +78,15 @@ class TitleScene(Scene):
         for x, y, sp, f, sc in self.gems:
             img, ay = gems.get(f, "strum", "normal", int(40 * sc))
             surf.blit(img, (x, y))
-        draw_title_logo(surf, self.assets, (W // 2, 190), 170, self.t)
+        draw_title_logo(surf, self.assets, (W // 2, 176), 560, self.t)
         tag = self.assets.text.render(t("title.tagline"), 22, NEON_CYAN, "ui", True)
         pill = pygame.Rect(0, 0, tag.get_width() + 40, tag.get_height() + 10)
-        pill.center = (W // 2, 318 + tag.get_height() // 2)
+        pill.center = (W // 2, 356 + tag.get_height() // 2)
         ps = pygame.Surface(pill.size, pygame.SRCALPHA)
         pygame.draw.rect(ps, (14, 11, 9, 220), (0, 0, *pill.size), border_radius=pill.h // 2)
         pygame.draw.rect(ps, NEON_CYAN + (160,), (0, 0, *pill.size), 1, border_radius=pill.h // 2)
         surf.blit(ps, pill.topleft)
-        surf.blit(tag, (W // 2 - tag.get_width() // 2, 318))
+        surf.blit(tag, (W // 2 - tag.get_width() // 2, 356))
         self.menu.draw(surf, self.assets, 420)
         v = self.assets.text.render(f"v{VERSION}", 14, TEXT_DIM)
         surf.blit(v, (W - v.get_width() - 12, 8))

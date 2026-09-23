@@ -233,8 +233,8 @@ def _ini_escape(v: str) -> str:
     return str(v).replace("\r", " ").replace("\n", " ").strip()
 
 
-LOADING_PHRASES = {"guitar": "Auto-charted by RIFF from the separated guitar part.",
-                   "mix": "Auto-charted by RIFF: the notes follow the whole mix."}
+LOADING_PHRASES = {"guitar": "Auto-charted from the separated guitar part.",
+                   "mix": "Auto-charted: the notes follow the whole mix."}
 
 
 def write_song_ini(path: str, meta: AudioMeta, *, length_ms: int, preview_ms: int, diff: int,

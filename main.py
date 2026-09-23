@@ -1,4 +1,4 @@
-"""RIFF - 5 perdeli ritim oyunu. Giris noktasi.
+"""Guitar Hero (eski adi RIFF) - 5 perdeli ritim oyunu. Giris noktasi.
 
 Kullanim:
   python main.py                              oyun (ana menu)
@@ -18,7 +18,7 @@ import traceback
 
 
 def parse_args(argv=None):
-    p = argparse.ArgumentParser(prog="RIFF", description="RIFF - 5-fret rhythm game")
+    p = argparse.ArgumentParser(prog="GuitarHero", description="Guitar Hero - 5-fret rhythm game")
     p.add_argument("--song", help="song folder path or song name")
     p.add_argument("--diff", default=None, help="easy / medium / hard / expert (default: expert or hardest)")
     p.add_argument("--autoplay", action="store_true", help="bot plays the song")
@@ -149,7 +149,7 @@ def write_crash_log(exc: BaseException) -> str:
         import datetime
         import platform
         with open(path, "a", encoding="utf-8") as fh:
-            fh.write(f"==== RIFF crash {datetime.datetime.now().isoformat()} ====\n")
+            fh.write(f"==== Guitar Hero crash {datetime.datetime.now().isoformat()} ====\n")
             fh.write(f"python {sys.version}\nplatform {platform.platform()}\nargv {sys.argv}\n")
             try:
                 import pygame
@@ -179,7 +179,8 @@ def main(argv=None) -> int:
         if getattr(sys, "frozen", False) and sys.platform == "win32":
             try:
                 import ctypes
-                ctypes.windll.user32.MessageBoxW(None, f"RIFF crashed. Details were written to:\n{path}", "RIFF", 0x10)
+                ctypes.windll.user32.MessageBoxW(None, f"Guitar Hero crashed. Details were written to:\n{path}",
+                                                 "Guitar Hero", 0x10)
             except Exception:
                 pass
         return 1

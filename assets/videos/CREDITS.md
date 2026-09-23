@@ -1,6 +1,6 @@
 # Background video credits
 
-These short clips are generic gameplay backgrounds. RIFF loops them behind the
+These short clips are generic gameplay backgrounds. The game loops them behind the
 note highway when a song has no video of its own. They do not show or endorse
 any particular artist, band or song.
 

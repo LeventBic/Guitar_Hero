@@ -3,7 +3,7 @@
 | # | Karar | Gerekçe |
 |---|---|---|
 | D01 | **R01 sapması:** Unity 6.3 yerine Python 3.14 + pygame-ce 2.5 + numpy, PyInstaller ile `.exe` | Makinede Unity/.NET SDK yok; hedef tek gecede EXE. İki katman (R02) korunur: `gh.engine/chart/timing/models` pygame import etmez, saf ve test edilebilir → ileride C# `Riff.Core`'a birebir taşınabilir. |
-| D02 | Oyun adı **RİFF** (R14) | "Guitar Hero" adı/ticari takdimi kullanılmaz; klasör adı `guitarhero` kullanıcı isteği olarak kaldı. |
+| D02 | *(D18 ile değişti.)* Oyun adı **RİFF** (R14) | "Guitar Hero" adı/ticari takdimi kullanılmaz; klasör adı `guitarhero` kullanıcı isteği olarak kaldı. |
 | D03 | Mekanik değerleri Clone Hero/YARG varsayılanları (R05, R06): ±70 ms, 50/25, 1x→4x, SP %25/%50/8 ölçü, whammy 1/30 | Araştırmada üç implementasyonda doğrulanmış değerler. |
 | D04 | Ses saati: pygame `Sound` stem'leri aynı anda başlatılır, saat `perf_counter` tabanlı monoton, `audio_offset` ile düzeltilir | pygame'de dspTime yok; tüm stem'ler RAM'de, aynı çağrıda başlar → sapma ihmal edilebilir. |
 | D05 | Demo şarkılar tamamen sentezlenmiş, özgün (telif yok) | R14: lisanssız şarkı dağıtılmaz. Gitar stem'i chart'taki notaları çalar → "kaçırınca gitar kesilir" gerçekten çalışır. |
@@ -19,3 +19,4 @@
 | D15 | **Arka plan videosu:** PyAV (FFmpeg) ile ayrı iş parçacığında çözme; şarkının kendi videosu ses konumunu izler, yoksa `assets/videos` altındaki 15 Pexels klibinden biri döngüde. Menülerde de. Ayardan kapatılabilir. | Kullanıcı isteği ("klibi varsa o, yoksa gitarist klipleri"). Pexels License yazılım içinde dağıtıma izin verir. |
 | D16 | **Guitar Hero tarzı tema:** neon synthwave yerine gül ağacı sap, krom raylar, metal paneller, alev / kehribar / bronz palet (palet sabitlerinin adları geriye uyum için korundu). | Kullanıcı isteği. |
 | D17 | **Kurulum konumu ve setlist'ler:** kullanıcının oyunu OneDrive dışına (`C:\Users\bicak\RIFF`) taşındı (~10 GB şarkı); `Songs\` altındaki üst klasörler setlist sayılır, şarkı listesi setlist'lere göre gruplanır. | OneDrive ücretsiz kotası 5 GB; 900 şarkılık listede gruplama gerekli. |
+| D18 | **Oyunun adı \"Guitar Hero\" (kullanıcı kararı, 2026-09-24)**, logo `assets/logo.png` (kullanıcının verdiği görsel, `tools/make_logo.py` ile arka planı saydamlaştırıldı). Exe `GuitarHero.exe`, paket `GuitarHero-windows.zip`. İç adlar (`gh` paketi, \"RIFF Demo Band\", \"RIFF Auto\") değişmedi. | Kullanıcı isteği. **Risk:** \"Guitar Hero\" Activision'ın tescilli markası; depo / sürüm herkese açılırsa marka şikâyetiyle kaldırılabilir (D02'nin gerekçesi buydu). |

@@ -1,4 +1,4 @@
-# PyInstaller spec: pyinstaller RIFF.spec --noconfirm --clean  (build.ps1 kullanin)
+# PyInstaller spec: pyinstaller GuitarHero.spec --noconfirm --clean  (build.ps1 kullanin) -> dist\GuitarHero\GuitarHero.exe
 # onedir: hizli acilis; Songs/ klasoru exe'nin yanina kopyalanir (kullanici kendi sarkilarini ekleyebilsin).
 # assets/models (Demucs + basic-pitch ONNX) datas ile gelir; onnxruntime ve soundfile (libsndfile: OGG stem
 # yazimi) hooks-contrib kancalariyla toplanir.
@@ -21,11 +21,11 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="RIFF",
+    name="GuitarHero",
     debug=False,
     strip=False,
     upx=False,
     console=False,
     icon="assets/icon.ico",
 )
-coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="RIFF")
+coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="GuitarHero")

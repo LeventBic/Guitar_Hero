@@ -571,6 +571,23 @@ class Assets:
             self._buttons[key] = b
         return b
 
+    def logo(self, width: int) -> pygame.Surface | None:
+        """assets/logo.png (saydam), istenen genislige olceklenmis; yoksa None."""
+        key = ("__logo__", width)
+        if key in self._album:
+            return self._album[key]
+        img = None
+        try:
+            import os
+
+            from ..config import resource_root
+            raw = pygame.image.load(os.path.join(resource_root(), "assets", "logo.png")).convert_alpha()
+            img = pygame.transform.smoothscale(raw, (width, round(raw.get_height() * width / raw.get_width())))
+        except Exception:
+            img = None
+        self._album[key] = img
+        return img
+
     def album(self, path: str, size: int) -> pygame.Surface | None:
         key = (path, size)
         if key in self._album:

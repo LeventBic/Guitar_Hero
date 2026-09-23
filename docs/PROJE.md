@@ -1,6 +1,6 @@
-# RİFF — Proje belgesi
+# Guitar Hero (eski adı RİFF) — Proje belgesi
 
-Bu belge RİFF'in ne olduğunu, nasıl yapıldığını, hangi sistemleri kullandığını ve içerikleri (modeller, chart'lar,
+Bu belge Guitar Hero'in ne olduğunu, nasıl yapıldığını, hangi sistemleri kullandığını ve içerikleri (modeller, chart'lar,
 klipler) **nereden aldığımızı** anlatır. Kurulum ve oynanış için [README](../README.md), modül sözleşmeleri için
 [ARCHITECTURE](ARCHITECTURE.md), tek tek kararlar ve gerekçeleri için [KARARLAR](KARARLAR.md), yapılış sırası için
 [PLAN](../PLAN.md).
@@ -9,13 +9,13 @@ klipler) **nereden aldığımızı** anlatır. Kurulum ve oynanış için [READM
 
 ## 1. Özet
 
-RİFF, Guitar Hero / Clone Hero'nun **5 perdeli gitar mekaniğini** birebir uygulayan bir Windows ritim oyunudur.
+Guitar Hero, Guitar Hero / Clone Hero'nun **5 perdeli gitar mekaniğini** birebir uygulayan bir Windows ritim oyunudur.
 
 | | |
 |---|---|
 | Dil / çalışma zamanı | Python 3.14 |
 | Oyun motoru | kendi motorumuz + pygame-ce (SDL2) |
-| Dağıtım | PyInstaller → `RIFF.exe` (onedir), GitHub Releases'ta `RIFF-windows.zip` |
+| Dağıtım | PyInstaller → `GuitarHero.exe` (onedir), GitHub Releases'ta `GuitarHero-windows.zip` |
 | Şarkı biçimi | Clone Hero uyumlu klasör: `notes.chart` / `notes.mid` + `song.ini` + ses stem'leri (+ `video.*`) |
 | Kendi şarkını ekleme | MP3/OGG/WAV/FLAC/OPUS sürükle-bırak → yapay zekâ ile otomatik chart |
 | Elle yapılmış chart | Chorus Encore'dan indirme aracı (`tools/chorus_fetch.py`) |
@@ -34,7 +34,7 @@ RİFF, Guitar Hero / Clone Hero'nun **5 perdeli gitar mekaniğini** birebir uygu
 | [ONNX Runtime](https://onnxruntime.ai) | 1.30 | yapay zekâ modellerini CPU'da çalıştırma | MIT |
 | [PyAV](https://github.com/PyAV-Org/PyAV) (FFmpeg) | 18.1 | arka plan videosu çözme (mp4, webm, ...) | BSD-3 / LGPL |
 | [python-soundfile](https://github.com/bastibe/python-soundfile) (libsndfile) | 0.14 | OGG Vorbis stem yazma, etiket okuma | BSD-3 / LGPL |
-| [PyInstaller](https://pyinstaller.org) | 6.22 | tek klasörlük `RIFF.exe` | GPL-2 + bootloader istisnası |
+| [PyInstaller](https://pyinstaller.org) | 6.22 | tek klasörlük `GuitarHero.exe` | GPL-2 + bootloader istisnası |
 | [pytest](https://pytest.org) | 9.1 | testler | MIT |
 | [GitHub CLI](https://cli.github.com) | — | depo, release | — |
 
@@ -141,6 +141,8 @@ birebir senkron için elle yapılmış chart gerekir (4.3).
 - Ayarlar → *Arka plan videosu* ile kapatılabilir.
 
 ### 4.5 Arayüz
+Ad ve logo: oyunun adı **Guitar Hero** (eski adı RİFF; marka notu için KARARLAR D18), logo `assets/logo.png`
+(kullanıcının verdiği görsel; `tools/make_logo.py` koyu arka planı saydamlaştırır, metal harflerin hatlarını opak tutar).
 Guitar Hero tarzı rock sahnesi: gül ağacı sap dokusu, gümüş teller ve perde çizgileri, krom raylar, vidalı metal
 paneller, alev turuncu / kehribar / bronz palet, alev parlamalı logo. Arayüz öğeleri kodla (prosedürel)
 çizilir; hazır görsel olarak yalnız ikon ve şarkıların kapakları var. Ekran görüntüleri `docs/screenshots/`.
@@ -199,17 +201,17 @@ py -3.14 -m venv .venv
 ### Exe ve dağıtım
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1 -Zip  # test + ikon + PyInstaller + zip
-gh release create vX.Y.Z dist\RIFF-windows.zip --title "RİFF vX.Y.Z" --notes "..."
+gh release create vX.Y.Z dist\GuitarHero-windows.zip --title "Guitar Hero vX.Y.Z" --notes "..."
 ```
-- `dist\RIFF\RIFF.exe` (~170 MB klasör: onnxruntime, FFmpeg, modeller, klipler), `dist\RIFF-windows.zip` (~100 MB,
+- `dist\GuitarHero\GuitarHero.exe` (~170 MB klasör: onnxruntime, FFmpeg, modeller, klipler), `dist\GuitarHero-windows.zip` (~100 MB,
   yalnız demo şarkılar).
-- Proje OneDrive'da: `build.ps1` bazen `build\RIFF\base_library.zip` bulunamadı hatası verir (senkron kilidi) —
+- Proje OneDrive'da: `build.ps1` bazen `build\GuitarHero\base_library.zip` bulunamadı hatası verir (senkron kilidi) —
   tekrar çalıştırmak yeter.
 
 ### Şarkı ekleme araçları
 ```powershell
 .\.venv\Scripts\python.exe tools\chorus_fetch.py "Metallica One" --list
-.\.venv\Scripts\python.exe tools\chorus_fetch.py "Metallica One" --songs C:\Users\<ben>\RIFF\Songs
+.\.venv\Scripts\python.exe tools\chorus_fetch.py "Metallica One" --songs C:\Users\<ben>\GuitarHero\Songs
 .\.venv\Scripts\python.exe tools\chorus_fetch.py --from-file liste.txt --no-video --songs <klasör>
 .\.venv\Scripts\python.exe tools\chorus_fetch.py --fill "<şarkı klasörü>"       # eksik zorlukları üret
 .\.venv\Scripts\python.exe main.py --import sarki.mp3 --smoke                    # otomatik chart + bot
@@ -225,7 +227,7 @@ oyun ve testler için gerekmez, dosyalar repoda.
 
 | | |
 |---|---|
-| Oyun | `C:\Users\bicak\RIFF\RIFF.exe` (OneDrive dışında; Masaüstünde `RIFF` kısayolu) |
+| Oyun | `C:\Users\bicak\GuitarHero\GuitarHero.exe` (OneDrive dışında; Masaüstünde `Guitar Hero` kısayolu) |
 | `Songs\` (kök, "Şarkılarım") | 3 demo + Metallica "One" (DeltaOm3ga topluluk chart'ı, Hard/Medium/Easy üretildi) |
 | `Songs\Guitar Hero Live\` | 42 şarkı (R U Mine? klipli, diğerleri klipsiz) |
 | `Songs\Guitar Hero ...\` | Guitar Hero, II, Encore 80s, III, On Tour (3), Aerosmith, World Tour, Metallica, Smash Hits, 5, Band Hero, Van Halen, Warriors of Rock — ana disk listeleri, 833 şarkı (~10 GB; co-op kopyaları hariç; DJ Hero'larda gitar chart'ı yok) |

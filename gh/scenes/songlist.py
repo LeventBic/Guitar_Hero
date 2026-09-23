@@ -281,7 +281,7 @@ class SongListScene(Scene):
             surf.blit(art, (ax, ay))
         else:
             pygame.draw.rect(surf, (39, 34, 29), (ax, ay, 250, 250), border_radius=8)
-            q = tc.glow("RIFF", 60, (255, 206, 120), glow_color=NEON_PINK)
+            q = a.logo(230) or tc.glow("GH", 60, (255, 206, 120), glow_color=NEON_PINK)
             surf.blit(q, (ax + 125 - q.get_width() // 2, ay + 125 - q.get_height() // 2))
         pygame.draw.rect(surf, (200, 200, 230), (ax - 2, ay - 2, 254, 254), 2, border_radius=4)
         tx = ax + 272

@@ -1,4 +1,4 @@
-# RİFF — Guitar Hero tarzı 5 perdeli ritim oyunu
+# Guitar Hero — 5 perdeli ritim oyunu (eski adı RİFF)
 
 Guitar Hero / Clone Hero'nun gitar ve nota mekaniğinin birebir kopyası (Python 3.14 + pygame-ce).
 Kaynak araştırma: `Levo-researches/` (LeventBic/Levo-Researches → `reports/oyun/2026-09-18-gitar-ritim-oyunu-*`).
@@ -7,8 +7,8 @@ Kaynak araştırma: `Levo-researches/` (LeventBic/Levo-Researches → `reports/o
 ![oyun](docs/screenshots/gameplay_star_power.png)
 
 ## İndir ve oyna (Windows)
-1. [Releases](https://github.com/LeventBic/Guitar_Hero/releases/latest) sayfasından `RIFF-windows.zip`'i indir.
-2. Zip'i bir klasöre çıkar, `RIFF\RIFF.exe`'yi çalıştır (kurulum gerekmez; klasörün tamamı birlikte kalmalı).
+1. [Releases](https://github.com/LeventBic/Guitar_Hero/releases/latest) sayfasından `GuitarHero-windows.zip`'i indir.
+2. Zip'i bir klasöre çıkar, `GuitarHero\GuitarHero.exe`'yi çalıştır (kurulum gerekmez; klasörün tamamı birlikte kalmalı).
 3. Kendi şarkını eklemek için MP3/OGG/FLAC dosyasını oyun penceresine sürükle (aşağıda: *Kendi şarkını ekle*).
 
 ## Kaynaktan çalıştırma
@@ -21,10 +21,10 @@ py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe tools\make_demo_songs.py    # demo şarkılar -> Songs\ (~11 s)
 .\.venv\Scripts\python.exe main.py
 ```
-Kendi exe'ni üretmek: `powershell -ExecutionPolicy Bypass -File build.ps1 -Zip` → `dist\RIFF\RIFF.exe` + `dist\RIFF-windows.zip`.
+Kendi exe'ni üretmek: `powershell -ExecutionPolicy Bypass -File build.ps1 -Zip` → `dist\GuitarHero\GuitarHero.exe` + `dist\GuitarHero-windows.zip`.
 
 ## Oynamak
-`RIFF.exe` (klasörün tamamı birlikte taşınmalı; `Songs\` exe'nin yanında).
+`GuitarHero.exe` (klasörün tamamı birlikte taşınmalı; `Songs\` exe'nin yanında).
 Kendi şarkıların: Clone Hero formatındaki klasörleri (`notes.chart`/`notes.mid`, `song.ini`, `song.ogg`, `guitar.ogg`) `Songs\` içine at.
 
 | Aksiyon | Klavye | Xbox 360 gitar |
@@ -66,7 +66,7 @@ Herhangi bir şarkıyı (MP3, OGG, WAV, FLAC, OPUS) oyuna at, 4 zorluğun notala
 .\.venv\Scripts\python.exe tools\make_demo_songs.py     # demo şarkıları yeniden üret (~11 s)
 .\.venv\Scripts\python.exe main.py --import sarki.mp3 --smoke   # headless: şarkı ekle + bot ile oynat
 .\.venv\Scripts\python.exe tools\benchmark_autochart.py # otomatik chart ölçümü (demo miksler vs el yapımı chart)
-powershell -ExecutionPolicy Bypass -File build.ps1      # test + ikon + PyInstaller -> dist\RIFF\RIFF.exe
+powershell -ExecutionPolicy Bypass -File build.ps1      # test + ikon + PyInstaller -> dist\GuitarHero\GuitarHero.exe
 ```
 Diğer bayraklar: `--screenshot out.png --at 30`, `--screenshot-menu out.png`, `--no-bot`, `--quit-after N`, `--fps N`.
 Çökme olursa `riff_crash.log` exe'nin yanına yazılır.

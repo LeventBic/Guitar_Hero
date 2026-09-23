@@ -9,7 +9,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-GAME_TITLE = "RIFF"  # R14: "Guitar Hero" adi kullanilmaz
+GAME_TITLE = "Guitar Hero"  # D18: kullanici karari (eski ad RIFF); tescilli marka, bkz. docs/KARARLAR.md
 
 # --- Yollar -----------------------------------------------------------------
 

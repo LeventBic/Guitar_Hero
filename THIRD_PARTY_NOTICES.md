@@ -1,6 +1,6 @@
 # Third-party notices
 
-RIFF bundles or depends on the following third-party components.
+Guitar Hero (formerly RIFF) bundles or depends on the following third-party components.
 
 ## Models (`assets/models/`)
 

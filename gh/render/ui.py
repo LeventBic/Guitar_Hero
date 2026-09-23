@@ -300,13 +300,27 @@ def fade_overlay(surf, alpha: int, color=(0, 0, 0)) -> None:
     surf.blit(s, (0, 0))
 
 
-def draw_title_logo(surf, assets, center, size=150, t=0.0) -> None:
-    img = assets.text.glow("RIFF", size, (255, 206, 120), "title", True, glow_color=(255, 90, 20), radius=16)
+def draw_title_logo(surf, assets, center, width=560, t=0.0) -> None:
+    """Oyun logosu (assets/logo.png) - alevler hafifce titrer; dosya yoksa yazi logosu."""
+    img = assets.logo(width)
+    if img is None:
+        from ..config import GAME_TITLE
+        img = assets.text.glow(GAME_TITLE.upper(), 110, (255, 206, 120), "title", True, glow_color=(255, 90, 20),
+                               radius=16)
     x = center[0] - img.get_width() // 2
     y = center[1] - img.get_height() // 2
     surf.blit(img, (x, y))
-    # alt cizgi
-    w = img.get_width() - 80
-    k = 0.5 + 0.5 * math.sin(t * 2.5)
-    col = lerp_color(NEON_CYAN, (255, 255, 255), k * 0.4)
-    pygame.draw.line(surf, col, (center[0] - w // 2, y + img.get_height() - 30), (center[0] + w // 2, y + img.get_height() - 30), 3)
+    # alev titremesi: logonun sicak tonlu, karartilmis kopyasi toplamali ve degisken siddetle (bir kez hazirlanir)
+    glow = _LOGO_GLOW.get(id(img))
+    if glow is None:
+        glow = img.copy()
+        glow.fill((70, 34, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
+        _LOGO_GLOW.clear()
+        _LOGO_GLOW[id(img)] = glow
+    k = max(0.0, math.sin(t * 7.0) * math.sin(t * 2.3))
+    if k > 0.05:
+        glow.set_alpha(int(255 * k))
+        surf.blit(glow, (x, y), special_flags=pygame.BLEND_ADD)
+
+
+_LOGO_GLOW: dict = {}
