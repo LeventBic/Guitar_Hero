@@ -111,7 +111,16 @@ def test_menu_navigation_keyboard_only(app):
     assert isinstance(app.top, PauseScene)
     _press(app, pygame.K_DOWN)
     _press(app, pygame.K_DOWN)
-    _press(app, pygame.K_RETURN)
+    _press(app, pygame.K_RETURN)          # duraklatma -> SETTINGS
+    assert isinstance(app.top, SettingsScene) and app.top.in_game
+    _press(app, pygame.K_ESCAPE)
+    assert isinstance(app.top, PauseScene)
+    _press(app, pygame.K_DOWN)
+    _press(app, pygame.K_RETURN)          # QUIT TO SONG LIST
+    assert isinstance(app.top, SongListScene)
+    _press(app, pygame.K_TAB)             # sarki listesi -> ayarlar
+    assert isinstance(app.top, SettingsScene)
+    _press(app, pygame.K_ESCAPE)
     assert isinstance(app.top, SongListScene)
     _press(app, pygame.K_ESCAPE)
     assert isinstance(app.top, TitleScene)
@@ -129,12 +138,17 @@ def test_keyboard_mapping(app):
     from gh.input import InputManager
     im = InputManager(app.settings)
     prev, now = im.begin_poll()
-    im.process(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_a, mod=0), now)
+    for i, key in enumerate((pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5)):
+        im.process(pygame.event.Event(pygame.KEYDOWN, key=key, mod=0), now)
+        assert (im.game[-1].kind, im.game[-1].fret) == (InputKind.FRET_DOWN, i)
+    im.process(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE, mod=0), now)
+    assert im.game[-1].kind == InputKind.STRUM          # Space = normal strum (perdeler sayilir)
     im.process(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_DOWN, mod=0), now)
     im.process(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SEMICOLON, mod=0), now)
     kinds = [(g.kind, g.fret) for g in im.game]
     assert (InputKind.FRET_DOWN, 0) in kinds
     assert (InputKind.STRUM, -1) in kinds
+    assert not any(g.kind == InputKind.OPEN_STRUM for g in im.game)
     assert any(g.kind == InputKind.WHAMMY and g.value == 1.0 for g in im.game)
     assert "CONFIRM" in im.menu and "DOWN" in im.menu
     # whammy basili kalinca salinim uretir

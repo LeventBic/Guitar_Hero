@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, fields
 from .config import AudioConfig, KeyConfig, Settings, VideoConfig, user_root
 
 SETTINGS_FILE = "settings.json"
-VERSION = 1
+VERSION = 2  # 2: varsayilan tuslar 1-5 + Space strum; eski dosyalarin tuslari yok sayilir
 
 # on yuz ekstra tercihleri (config dataclass'larinda olmayanlar)
 DEFAULT_EXTRA = {
@@ -131,7 +131,8 @@ def load_settings(path: str | None = None) -> AppSettings:
         return s
     _apply(s.video, data.get("video", {}))
     _apply(s.audio, data.get("audio", {}))
-    _apply(s.keys, data.get("keys", {}))
+    if isinstance(data.get("version"), int) and data["version"] >= 2:
+        _apply(s.keys, data.get("keys", {}))
     eng = data.get("engine", {})
     if isinstance(eng, dict) and isinstance(eng.get("no_fail"), bool):
         s.engine.no_fail = eng["no_fail"]

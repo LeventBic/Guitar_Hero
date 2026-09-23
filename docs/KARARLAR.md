@@ -9,4 +9,5 @@
 | D05 | Demo şarkılar tamamen sentezlenmiş, özgün (telif yok) | R14: lisanssız şarkı dağıtılmaz. Gitar stem'i chart'taki notaları çalar → "kaçırınca gitar kesilir" gerçekten çalışır. |
 | D06 | `.mid` okuyucu kendi SMF parser'ı (bağımlılıksız) | R07 DryWetMidi C#'a özgü; Python'da mido gerekmez, format basit. |
 | D07 | No Fail varsayılan açık (R13), ayarlardan kapatılabilir | — |
-| D08 | Klavye: A S J K L / ↑ ↓ / Space (açık nota) / H (SP) / ; (whammy) / Enter (başlat) + alternatif 1–5, F1–F5 | Clone Hero standardı (ek-01 §4.7). |
+| D08 | ~~Klavye: A S J K L / ↑ ↓ / Space (açık nota) / H / ; / Enter~~ **DEPRECATED** → D09 | Clone Hero standardı (ek-01 §4.7). |
+| D09 | Klavye (kullanıcı isteği, 2026-09-23): perdeler **1 2 3 4 5**, **Space = strum** (↑ ↓ de strum), H = SP, ; = whammy, Enter/Esc = duraklat. Ayrı açık-strum tuşu yok (açık notalar perdesiz strum ile). Ayarlar ana menü, şarkı listesi (Tab) ve duraklatma menüsünden açılır. `settings.json` v2: eski dosyaların tuşları yok sayılır. | Kullanıcı tercihi; Space açık-strum iken basılı perdeleri yok sayıp nota kaçırtıyordu. |

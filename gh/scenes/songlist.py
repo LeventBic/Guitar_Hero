@@ -62,6 +62,14 @@ class SongListScene(Scene):
             self.sfx("menu_back")
             self.app.pop()
             return
+        if action == "OPTION":
+            from .settings import SettingsScene
+            self.sfx("menu_select")
+            self.app.audio.stop_preview(150)
+            self.preview_started = False
+            self.dwell = 0.0
+            self.app.push(SettingsScene(self.app))
+            return
         if not self.songs:
             return
         if action in ("UP", "DOWN", "LEFT", "RIGHT"):
@@ -223,7 +231,8 @@ class SongListScene(Scene):
             for k in range(5):
                 h = 6 + 10 * abs(math.sin(self.t * 6 + k * 1.3))
                 pygame.draw.rect(surf, NEON_PINK, (det.right - 60 + k * 8, det.bottom - 24 - h, 5, h))
-        draw_hints(surf, a, [("Up/Down / Strum", "Move"), ("Enter / Green", "Select"), ("Esc / Red", "Back")])
+        draw_hints(surf, a, [("Up/Down / Strum", "Move"), ("Enter / Green", "Select"), ("Tab", "Settings"),
+                             ("Esc / Red", "Back")])
 
 
 class DifficultyScene(Scene):

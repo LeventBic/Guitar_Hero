@@ -29,7 +29,7 @@ WHAMMY_KEY_PERIOD = 0.100
 NAV_KEYS = {
     pygame.K_UP: "UP", pygame.K_DOWN: "DOWN", pygame.K_LEFT: "LEFT", pygame.K_RIGHT: "RIGHT",
     pygame.K_RETURN: "CONFIRM", pygame.K_KP_ENTER: "CONFIRM", pygame.K_ESCAPE: "BACK",
-    pygame.K_BACKSPACE: "BACK", pygame.K_TAB: "OPTION",
+    pygame.K_BACKSPACE: "BACK", pygame.K_TAB: "OPTION", pygame.K_SPACE: "CONFIRM",
 }
 REPEATABLE = {"UP", "DOWN", "LEFT", "RIGHT"}
 

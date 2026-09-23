@@ -134,11 +134,12 @@ class AudioConfig:
 
 @dataclass
 class KeyConfig:
-    # §4.7 Clone Hero klavye standardi + alternatifler. pygame.key.key_code isimleri.
-    frets: tuple = (("a", "1", "f1"), ("s", "2", "f2"), ("j", "3", "f3"), ("k", "4", "f4"), ("l", "5", "f5"))
-    strum_up: tuple = ("up",)
+    # Kullanici tercihi: perdeler 1-5, Space = strum (vurus). pygame.key.key_code isimleri.
+    # Acik notalar normal strum ile (hic perde basmadan) calinir; ayri acik-strum tusu opsiyonel.
+    frets: tuple = (("1",), ("2",), ("3",), ("4",), ("5",))
+    strum_up: tuple = ("space", "up")
     strum_down: tuple = ("down",)
-    open_strum: tuple = ("space",)
+    open_strum: tuple = ()
     star_power: tuple = ("h", "right shift")
     whammy: tuple = (";", "'")
     start: tuple = ("return",)

@@ -5,6 +5,9 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 $py = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 
+$running = Get-Process RIFF -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$PSScriptRoot\dist\*" }
+if ($running) { throw "dist\RIFF\RIFF.exe su an acik; once oyunu kapatin." }
+
 if (-not $SkipTests) {
     & $py -m pytest tests -q
     if ($LASTEXITCODE -ne 0) { throw "Testler basarisiz, build durduruldu." }

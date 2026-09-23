@@ -26,8 +26,10 @@ BUFFER_CHOICES = [256, 512, 1024, 2048]
 
 
 class SettingsScene(Scene):
-    def __init__(self, app):
+    def __init__(self, app, in_game: bool = False):
         super().__init__(app)
+        # in_game: duraklatma menusunden acildi -> calan sarkiyi bozacak satirlar (ses tamponu, kalibrasyon) gizli
+        self.in_game = in_game
         self.bg = SynthBackground()
         self.index = 1
         self.scroll = 0.0
@@ -57,8 +59,9 @@ class SettingsScene(Scene):
                   lambda x: f"{int(round(x * 100))}%"))
         R.append(("num", "Audio offset", lambda: a.audio_offset_ms, lambda x: setattr(a, "audio_offset_ms", int(x)), 1,
                   -500, 500, lambda x: f"{int(x):+d} ms"))
-        R.append(("choice", "Audio buffer", lambda: a.buffer, lambda x: setattr(a, "buffer", x), BUFFER_CHOICES,
-                  lambda x: f"{x} samples"))
+        if not self.in_game:
+            R.append(("choice", "Audio buffer", lambda: a.buffer, lambda x: setattr(a, "buffer", x), BUFFER_CHOICES,
+                      lambda x: f"{x} samples"))
         R.append(("header", "VIDEO"))
         R.append(("num", "Video offset", lambda: v.video_offset_ms, lambda x: setattr(v, "video_offset_ms", int(x)), 1,
                   -500, 500, lambda x: f"{int(x):+d} ms"))
@@ -66,7 +69,8 @@ class SettingsScene(Scene):
         R.append(("bool", "Show FPS / debug (F3)", lambda: v.show_debug, lambda x: setattr(v, "show_debug", x)))
         R.append(("choice", "FPS limit", lambda: v.fps_limit, lambda x: setattr(v, "fps_limit", x), FPS_CHOICES,
                   lambda x: "Unlimited" if x == 0 else f"{x}"))
-        R.append(("action", "Calibrate audio / video", self._calibrate))
+        if not self.in_game:
+            R.append(("action", "Calibrate audio / video", self._calibrate))
         R.append(("header", "CONTROLS  (Enter, then press a key)"))
         for key, label in KEY_ACTIONS:
             R.append(("key", label, key))
@@ -91,7 +95,7 @@ class SettingsScene(Scene):
     def _back(self) -> None:
         s = self.app.settings
         save_settings(s)
-        if s.audio.buffer != self.orig_buffer:
+        if s.audio.buffer != self.orig_buffer and not self.in_game:
             self.app.audio.reinit()
         self.sfx("menu_back")
         self.app.pop()

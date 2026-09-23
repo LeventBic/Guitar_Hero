@@ -329,7 +329,8 @@ class PauseScene(Scene):
     def __init__(self, app, game: GameplayScene):
         super().__init__(app)
         self.game = game
-        self.menu = MenuList(["RESUME", "RESTART", "QUIT TO SONG LIST"], W // 2, 330, spacing=62, size=34)
+        self.menu = MenuList(["RESUME", "RESTART", "SETTINGS", "QUIT TO SONG LIST"], W // 2, 318, spacing=54,
+                             size=32)
 
     def on_game(self, gi) -> None:
         # perde birakma/basmalari motora ilet (duraklatmada basili kalan perde takilmasin)
@@ -355,6 +356,9 @@ class PauseScene(Scene):
             elif i == 1:
                 self.app.pop()
                 self.game.restart()
+            elif i == 2:
+                from .settings import SettingsScene
+                self.app.push(SettingsScene(self.app, in_game=True))
             else:
                 self.app.pop()
                 self.game.conductor.stop()
@@ -370,7 +374,7 @@ class PauseScene(Scene):
 
     def draw(self, surf: pygame.Surface) -> None:
         fade_overlay(surf, 170, (6, 4, 16))
-        draw_panel(surf, (W // 2 - 280, 150, 560, 350), border=NEON_PINK, fill=(10, 6, 24, 200))
+        draw_panel(surf, (W // 2 - 280, 150, 560, 400), border=NEON_PINK, fill=(10, 6, 24, 200))
         img = self.assets.text.glow("PAUSED", 72, (255, 120, 210), glow_color=NEON_PINK)
         surf.blit(img, (W // 2 - img.get_width() // 2, 170))
         sub = self.assets.text.render(f"{self.game.title}  -  {self.game.artist}", 22, TEXT_DIM)
