@@ -2,7 +2,7 @@
 
 Guitar Hero / Clone Hero'nun gitar ve nota mekaniğinin birebir kopyası (Python 3.14 + pygame-ce).
 Kaynak araştırma: `Levo-researches/` (LeventBic/Levo-Researches → `reports/oyun/2026-09-18-gitar-ritim-oyunu-*`).
-Plan: [PLAN.md](PLAN.md) · Mimari: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Kararlar: [docs/KARARLAR.md](docs/KARARLAR.md)
+**Proje belgesi (kaynaklar, sistemler, nasıl yapıldı): [docs/PROJE.md](docs/PROJE.md)** · Plan: [PLAN.md](PLAN.md) · Mimari: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Kararlar: [docs/KARARLAR.md](docs/KARARLAR.md)
 
 ![oyun](docs/screenshots/gameplay_star_power.png)
 
@@ -60,7 +60,7 @@ Herhangi bir şarkıyı (MP3, OGG, WAV, FLAC, OPUS) oyuna at, 4 zorluğun notala
 ## Geliştirme
 ```powershell
 .\.venv\Scripts\python.exe main.py                     # oyunu kaynaktan çalıştır
-.\.venv\Scripts\python.exe -m pytest tests -q           # 186 test
+.\.venv\Scripts\python.exe -m pytest tests -q           # 193 test
 .\.venv\Scripts\python.exe main.py --smoke              # tüm şarkı × zorluk bot ile headless
 .\.venv\Scripts\python.exe main.py --song "Songs\RIFF Demo Band - Voltage Run" --diff expert --autoplay
 .\.venv\Scripts\python.exe tools\make_demo_songs.py     # demo şarkıları yeniden üret (~11 s)
