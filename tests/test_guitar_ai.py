@@ -127,6 +127,18 @@ def test_drop_pitch_spikes():
     assert 97 not in [p for _t, p, _v in _drop_pitch_spikes(line)]   # oktavla da yaklasmayan sicrama atilir
 
 
+def test_snap_to_attacks_and_flam_merge():
+    from gh.autochart.guitar import snap_to_attacks
+    flux = np.array([1.0, 2.0, 3.0, 3.03, 4.0])
+    evs = [_ev(1.035, 40), _ev(2.0, 40), _ev(2.5, 45), _ev(2.52, 45), _ev(3.0, 40), _ev(3.03, 47), _ev(5.0, 52)]
+    evs[2].picked = evs[3].picked = False                      # atagi olmayan zayif olaylar
+    evs[2].strength = evs[3].strength = 0.4
+    evs[6].picked, evs[6].strength = False, 0.9               # atak yok ama cok guclu: kalir
+    out = snap_to_attacks(evs, flux)
+    assert [round(e.time, 3) for e in out] == [1.0, 2.0, 3.0, 5.0]
+    assert out[2].root in (40.0, 47.0)                         # 3.00 + 3.03 flami tek nota
+
+
 def _ev(t, p):
     from gh.autochart.guitar import GuitarEvent
     return GuitarEvent(time=float(t), strength=0.6, pitches=[p], root=float(p), size=1, end=float(t) + 0.1)

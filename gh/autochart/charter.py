@@ -251,7 +251,17 @@ def assign_frets(values: list[float], nfrets: int, clarity: list[float] | None =
 
 # --------------------------------------------------------------------------- Expert
 
+GRID_TOL = RES // 12          # izgara disi (gercek zamaninda birakilan) notalarin siniflandirma toleransi
+
+
+def grid_tick(tick: int) -> int:
+    """En yakin 16'lik izgara tick'i (GRID_TOL icindeyse), degilse tick'in kendisi."""
+    g = int(round(tick / (RES // 4))) * (RES // 4)
+    return g if abs(g - tick) <= GRID_TOL else tick
+
+
 def metric_weight(tick: int, bar_ticks: set[int], p_ts: int) -> float:
+    tick = grid_tick(tick)
     if tick in bar_ticks:
         return 1.0
     r = tick % RES
@@ -391,6 +401,7 @@ def _select(notes: list[GNote], bar_ticks: set[int], min_gap: int, target: float
             gap = strong_gap
         k = bisect.bisect_left(chosen_ticks, t)
         ok = True
+        gap -= GRID_TOL                      # izgara disi notalar: 8'lik aralik birkac tick eksik olabilir
         if k > 0 and t - chosen_ticks[k - 1] < gap:
             ok = False
         if k < len(chosen_ticks) and chosen_ticks[k] - t < gap:

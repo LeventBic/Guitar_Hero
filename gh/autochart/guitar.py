@@ -39,6 +39,12 @@ LEAD_LO, LEAD_HI = 59, 92                     # zayif lead cizgisinin perde band
 LEAD_HARMONICS = np.array([0, 12, 19, 24, 28, 31, 34, 36])
 LEAD_MIN_RATE = 5.0                           # aciklanamayan yuksek onset tepesi / s
 LEAD_MIN_SECONDS = 3.0
+ATTACK_SNAP_S = 0.05                          # olay -> en yakin gercek atak (senkron)
+ATTACK_DROP_S = 0.06                          # bu kadar yakininda atak yoksa zayif olay atilir
+ATTACK_KEEP_STRENGTH = 0.7
+LEAD_SNAP_S = 0.03
+MIN_EVENT_GAP_S = 0.07                        # 32'likten hizli ardisik olaylar ayni vurus sayilir
+GRID_SNAP_S = 0.02                            # izgaraya yalniz bu kadar yakinsa oturt; degilse gercek zaman
 
 
 @dataclass
@@ -292,16 +298,62 @@ def build_events(gi: GuitarInput, act_t: np.ndarray, act: np.ndarray,
         events.append(GuitarEvent(time=tc, strength=float(strength), pitches=keep, root=float(root), size=size,
                                   end=max(end, tc), picked=s_f >= 0.45, low=low, bright=bright))
     fix_octaves(events)
+    events = snap_to_attacks(events, ft)
     events = chug_fill(gi, events, active)
     regions = weak_lead_regions(gi, flux_times=ft)
     if regions:
-        events = apply_lead(gi, events, regions, active)
+        events = apply_lead(gi, events, regions, active, flux_times=ft)
         if lead_out is not None:
             lead_out.extend(regions)
     return events
 
 
 # --------------------------------------------------------------------------- zayif lead (distorsiyonlu solo)
+
+def snap_to_attacks(events: list[GuitarEvent], flux_times: np.ndarray, snap_s: float = ATTACK_SNAP_S,
+                    drop_s: float | None = ATTACK_DROP_S, min_gap: float = MIN_EVENT_GAP_S) -> list[GuitarEvent]:
+    """Senkron: olay zamani gitar stem'indeki en yakin gercek ataga (spektral aki tepesi) tasinir (<= snap_s).
+    basic-pitch'in nota baslangici / posterior tepesi ataktan onlarca ms sapabilir; oyuncu sesi atakta duyar.
+    Yakininda (drop_s) hic atak olmayan zayif (pena vurusu olmayan) olaylar atilir: bunlar cogu zaman tutulan
+    notalarin kuyrugu ya da yanlis zamanlanmis tahminlerdir. Ayni ataga dusen olaylardan en gucusu kalir;
+    min_gap'ten yakin olaylar (cift kayitli gitarlarin L/R flami, ayni vurusun iki aki tepesi) tek olaya iner:
+    zaman ilk atak, icerik guclu olandan."""
+    ft = np.sort(np.asarray(flux_times, dtype=np.float64))
+    if not ft.size or not events:
+        return events
+    out: dict[float, GuitarEvent] = {}
+    kept: list[GuitarEvent] = []
+    for e in events:
+        k = int(np.searchsorted(ft, e.time))
+        cand = [ft[j] for j in (k - 1, k) if 0 <= j < ft.size]
+        near = min(cand, key=lambda x: abs(x - e.time))
+        d = abs(near - e.time)
+        if d <= snap_s:
+            e.end = max(e.end + (near - e.time), near)
+            e.time = float(near)
+            cur = out.get(e.time)
+            if cur is None or e.strength > cur.strength:
+                out[e.time] = e
+            continue
+        if drop_s is not None and d > drop_s and not e.picked and e.strength < ATTACK_KEEP_STRENGTH:
+            continue
+        kept.append(e)
+    merged: list[GuitarEvent] = []
+    for e in sorted(list(out.values()) + kept, key=lambda e: e.time):
+        if merged and e.time - merged[-1].time < min_gap:
+            p = merged[-1]
+            if e.strength > p.strength:
+                e.end = max(e.end, p.end)
+                e.picked = e.picked or p.picked
+                e.time = p.time
+                merged[-1] = e
+            else:
+                p.end = max(p.end, e.end)
+                p.picked = p.picked or e.picked
+            continue
+        merged.append(e)
+    return merged
+
 
 def onset_peaks(gi: GuitarInput, lo: int, hi: int, thr: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """basic-pitch onset posteriorunda [lo, hi] perde bandinin zamanda yerel tepeleri: (zaman, perde, deger)."""
@@ -436,9 +488,11 @@ def _drop_pitch_spikes(line: list[tuple[float, int, float]], span: float = 0.35)
 
 
 def apply_lead(gi: GuitarInput, events: list[GuitarEvent], regions: list[tuple[float, float]],
-               active) -> list[GuitarEvent]:
+               active, flux_times: np.ndarray | None = None) -> list[GuitarEvent]:
     """Zayif lead bolgelerindeki ritim (chug) olaylarini lead cizgisiyle degistir (Guitar Hero sololari calar)."""
     lead = lead_events(gi, regions, active)
+    if flux_times is not None and len(flux_times):
+        lead = snap_to_attacks(lead, np.asarray(flux_times), snap_s=LEAD_SNAP_S, drop_s=None, min_gap=0.055)
     if not lead:
         return events
 
@@ -560,16 +614,30 @@ def quantize_events(events: list[GuitarEvent], tm, first_tick: int, last_tick: i
         for f, i in items:
             q = int(round(f * div))
             tick = b * RES + q * (RES // div)
+            e = events[i]
+            on_grid = abs(tm.tick_to_time(tick) - e.time) <= GRID_SNAP_S
+            if not on_grid:
+                # tempo haritasi bu notada izgaraya uymuyor: notayi kaydirmak yerine gercek zamaninda birak
+                tick = int(round(tm.time_to_tick(e.time)))
             if tick < first_tick or tick > last_tick:
                 continue
-            e = events[i]
             cur = out.get(tick)
             if cur is None or e.strength > cur[1].strength:
                 g = GNote(tick=tick, time=tm.tick_to_time(tick), strength=e.strength, pitch=e.root, clarity=1.0,
                           width=0.0, low=0.0, sustain_s=max(0.0, e.end - e.time),
-                          triplet=div != 4 and q not in (0, div), chord=e.size)
+                          triplet=on_grid and div != 4 and q not in (0, div), chord=e.size)
                 out[tick] = (g, e)
-    ticks = sorted(out)
+    # izgara disi notalar komsulariyla cok yakin dusebilir (< 1/16 vurus): gucluyu tut
+    ticks: list[int] = []
+    for t in sorted(out):
+        if ticks and t - ticks[-1] < RES // 16:
+            if out[t][1].strength > out[ticks[-1]][1].strength:
+                del out[ticks[-1]]
+                ticks[-1] = t
+            else:
+                del out[t]
+            continue
+        ticks.append(t)
     return [out[t][0] for t in ticks], {t: out[t][1] for t in ticks}
 
 
