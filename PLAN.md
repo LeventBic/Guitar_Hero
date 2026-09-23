@@ -42,3 +42,12 @@ Durum: `[x]` bitti · `[~]` devam ediyor · `[ ]` bekliyor · (A/B/C/D = alt aja
 - 123 test yeşil; bot 3 şarkı × 4 zorlukta full combo (kaynak ve EXE); ~645 FPS uncapped
 - `dist\RIFF\RIFF.exe` (73 MB, onedir, `Songs\` yanında)
 - Açık: gerçek gitar kontrolcüsü donanımla test edilmedi; pygame olay zaman damgası vermediği için girdi ~1 kHz poll (±1 ms)
+
+## Faz 6 — Şarkı ekleme + gitar kalibrasyonu (yapay zekâ)
+- [x] Otomatik chart (miks tabanlı), sürükle-bırak / `_Import`, TR/EN
+- [x] `gh/ai`: Demucs htdemucs_6s + basic-pitch ONNX (onnxruntime, CPU), numpy STFT; `assets/models`
+- [x] `gh/autochart/guitar.py`: gitardan chart (aktivite, akor, perde merdiveni, sustain, force strum)
+- [x] İçe aktarma: `guitar.ogg` + `song.ogg` stem'leri, yeniden chart, iptal, gitarsız şarkıda miks yöntemine dönüş
+- [x] Distorsiyonlu solo tespiti (zayıf lead) → lead çizgisi + `E solo` işaretleri
+- [x] Testler (182), EXE (onnxruntime + soundfile + modeller, ~170 MB), EXE ile Metallica "One" içe aktarma (gitar modu, ~2 dk)
+- [ ] Açık: çok zayıf ayrışan gitarda (demo şarkılarındaki sentez gitar) chart seyrek kalabiliyor; bölüm adları miks analizinden (Verse 1..N)
