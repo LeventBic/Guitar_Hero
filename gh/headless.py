@@ -119,7 +119,7 @@ def screenshot_gameplay(app, info, diff: str, at: float, path: str, scale: float
         while _time.time() < end:
             scene.draw(app.screen)
             cur = scene.video._cur
-            want = scene.visual_time + (scene.lead_in if scene.video.loop else 0.0) + scene.video.start_offset
+            want = scene.video_time() + scene.video.start_offset
             if cur is not None and abs(cur[0] - want) < 0.1:
                 break
             _time.sleep(0.02)

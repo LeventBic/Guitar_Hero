@@ -121,6 +121,11 @@ class GameplayScene(Scene):
         self.song_time = self.conductor.frame_time
         self.visual_time = self.conductor.visual_time()
 
+    def video_time(self) -> float:
+        """Arka plan videosu saati: hazir klipler (dongu) geri sayimda da akar; sarkinin kendi videosu ses dosyasinin
+        konumunu izler (Clone Hero gibi): chart saati + chart.offset (.chart Offset + song.ini delay)."""
+        return self.visual_time + (self.lead_in if self.video.loop else self.chart.offset)
+
     def exit(self) -> None:
         self.conductor.stop()
         if self.video is not None:
@@ -331,8 +336,7 @@ class GameplayScene(Scene):
     def draw(self, surf: pygame.Surface) -> None:
         frame = None
         if self.video is not None:
-            # hazir klipler (dongu) geri sayimda da oynar; sarki videosu sarki saatine kilitli
-            vt = self.visual_time + (self.lead_in if self.video.loop else 0.0)
+            vt = self.video_time()
             frame = self.video.frame(vt)
         if frame is not None:
             surf.blit(frame, (0, 0))

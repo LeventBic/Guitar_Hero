@@ -96,3 +96,14 @@ def test_open_background_prefers_song_video(video, tmp_path, monkeypatch):
     assert st is not None and st.loop                        # klasor videosu yok: hazir klip, dongu
     st.close()
     assert V.open_background(str(empty), "x", (64, 48), allow_stock=False) is None
+
+
+def test_song_video_follows_audio_not_chart_time(tmp_path, monkeypatch):
+    """song.ini delay (chart.offset) chart'i sese gore kaydirir; sarki videosu ses konumunu izlemeli."""
+    from types import SimpleNamespace as NS
+
+    from gh.scenes.gameplay import GameplayScene
+    fake = NS(visual_time=10.0, lead_in=2.7, chart=NS(offset=3.649), video=NS(loop=False))
+    assert abs(GameplayScene.video_time(fake) - 13.649) < 1e-9
+    fake.video.loop = True
+    assert abs(GameplayScene.video_time(fake) - 12.7) < 1e-9
