@@ -210,8 +210,10 @@ def _posterior_end(gi: GuitarInput, t: float, pitch: int, max_s: float = 4.0, th
 
 
 def build_events(gi: GuitarInput, act_t: np.ndarray, act: np.ndarray,
-                 pitch_analyzer: dsp.PitchAnalyzer | None = None) -> list[GuitarEvent]:
-    """Aki tepeleri + basic-pitch baslangiclari -> birlestirilmis gitar olaylari (yalniz aktif bolgelerde)."""
+                 pitch_analyzer: dsp.PitchAnalyzer | None = None,
+                 lead_out: list | None = None) -> list[GuitarEvent]:
+    """Aki tepeleri + basic-pitch baslangiclari -> birlestirilmis gitar olaylari (yalniz aktif bolgelerde).
+    lead_out: verilirse lead cizgisiyle degistirilen (solo) bolgeler [(t0, t1)] eklenir."""
     hop = float(act_t[1] - act_t[0]) if act_t.size > 1 else 0.05
 
     def active(t: float) -> bool:
@@ -294,6 +296,8 @@ def build_events(gi: GuitarInput, act_t: np.ndarray, act: np.ndarray,
     regions = weak_lead_regions(gi)
     if regions:
         events = apply_lead(gi, events, regions, active)
+        if lead_out is not None:
+            lead_out.extend(regions)
     return events
 
 
@@ -650,6 +654,18 @@ def mark_force_strums(notes: list[GNote], evmap: dict[int, GuitarEvent]) -> None
         prev = n
 
 
+def solo_ticks(notes: list[GNote], tm, regions: list[tuple[float, float]], min_notes: int = 8
+               ) -> list[tuple[int, int]]:
+    """Solo bolgeleri (s) -> icindeki ilk / son Expert notasinin tick'leri."""
+    out = []
+    for a, b in regions:
+        ta, tb = tm.time_to_tick(a), tm.time_to_tick(b)
+        inside = [n.tick for n in notes if ta - RES // 8 <= n.tick <= tb + RES // 8]
+        if len(inside) >= min_notes and not any(s <= inside[0] <= e for s, e in out):
+            out.append((inside[0], inside[-1]))
+    return out
+
+
 def make_expert_guitar(ctx, events: list[GuitarEvent]) -> list[GNote]:
     tm = ctx.tm
     first = int(math.ceil(tm.time_to_tick(FIRST_NOTE_MIN)))
@@ -672,12 +688,13 @@ def make_expert_guitar(ctx, events: list[GuitarEvent]) -> list[GNote]:
 
 def generate_guitar(an: Analysis, events: list[GuitarEvent], *, title: str = "Unknown", artist: str = "Unknown",
                     album: str = "", year: str = "", genre: str = "", music_stream: str = "song.ogg",
-                    progress=None, check: bool = True) -> ChartResult:
+                    progress=None, check: bool = True, lead_regions: list | None = None) -> ChartResult:
     _progress(progress, 0.05, "Building tempo map")
     ctx = build_context(an)
     _progress(progress, 0.2, "Placing notes")
     expert = make_expert_guitar(ctx, events)
     if len(expert) < 8:
         raise ValueError("could not find enough guitar notes in this audio")
+    solos = solo_ticks(expert, ctx.tm, lead_regions or [])
     return finalize(ctx, expert, title=title, artist=artist, album=album, year=year, genre=genre,
-                    music_stream=music_stream, progress=progress, check=check, lo=0.5)
+                    music_stream=music_stream, progress=progress, check=check, lo=0.5, solos=solos)

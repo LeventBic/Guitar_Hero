@@ -160,6 +160,16 @@ def test_guitar_chart_from_true_stem(realmix):
     assert any(n.is_chord for n in notes) and any(not n.is_chord for n in notes)
     assert any(n.has_sustain for n in notes)                            # uzun power chord'lar
     assert out.result.validation and all(ok for ok, _m in out.result.validation.values())
+    assert out.lead_regions == []                                       # net transkribe edilen lead: solo yok
+    # solo isaretleri: lead bolumu solo verilirse her zorlukta E solo / soloend + 'Guitar Solo' bolumu
+    from gh.autochart.guitar import generate_guitar
+    lead_t = [e[0] for e in m.events if e[3] == "lead"]
+    res = generate_guitar(out.result.analysis, out.events, lead_regions=[(min(lead_t) - 0.05, max(lead_t) + 0.1)])
+    ch = parse_chart(res.text)
+    for d in ("easy", "medium", "hard", "expert"):
+        (so,) = ch.tracks[d].solos
+        assert abs(so.start_time - min(lead_t)) < 0.1 and abs(so.end_time - max(lead_t)) < 0.3, (d, so)
+    assert '"section Guitar Solo"' in res.text
 
 
 @needs_ai

@@ -1,15 +1,17 @@
 # PyInstaller spec: pyinstaller RIFF.spec --noconfirm --clean  (build.ps1 kullanin)
 # onedir: hizli acilis; Songs/ klasoru exe'nin yanina kopyalanir (kullanici kendi sarkilarini ekleyebilsin).
+# assets/models (Demucs + basic-pitch ONNX) datas ile gelir; onnxruntime ve soundfile (libsndfile: OGG stem
+# yazimi) hooks-contrib kancalariyla toplanir.
 
 a = Analysis(
     ["main.py"],
     pathex=["."],
     binaries=[],
     datas=[("assets", "assets")],
-    hiddenimports=[],
+    hiddenimports=["onnxruntime", "soundfile"],
     hookspath=[],
     runtime_hooks=[],
-    excludes=["tkinter", "matplotlib", "pytest", "soundfile", "PIL", "IPython", "unittest", "pydoc"],
+    excludes=["tkinter", "matplotlib", "pytest", "PIL", "IPython", "unittest", "pydoc"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

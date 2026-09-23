@@ -57,6 +57,7 @@ class ChartResult:
     difficulty: int = 0
     preview_ms: int = 0
     validation: dict = field(default_factory=dict)
+    solos: list = field(default_factory=list)         # [(baslangic tick, bitis tick)] (bitis dahil)
 
 
 # --------------------------------------------------------------------------- tempo haritasi
@@ -551,6 +552,9 @@ def write_chart(res: ChartResult, *, title: str, artist: str, album: str = "", y
             prev = n
         for t, ln in res.sp.get(d, []):
             rows.append((t, 1, f"S 2 {ln}"))
+        for a, b in res.solos:
+            if any(a <= n.tick <= b for n in notes):
+                rows += [(a, 2, "E solo"), (b, 3, "E soloend")]
         for t, _, s in sorted(rows):
             L.append(f"  {t} = {s}")
         L.append("}")
@@ -681,8 +685,9 @@ def build_context(an: Analysis) -> ChartContext:
 
 def finalize(ctx: ChartContext, expert: list[GNote], *, title: str, artist: str, album: str = "", year: str = "",
              genre: str = "", music_stream: str = "song.ogg", progress=None, check: bool = True,
-             lo: float = 0.86) -> ChartResult:
-    """Expert -> Hard/Medium/Easy indirgeme, SP, [Events], zorluk/onizleme, yazim ve kalite denetimi."""
+             lo: float = 0.86, solos: list | None = None) -> ChartResult:
+    """Expert -> Hard/Medium/Easy indirgeme, SP, [Events], zorluk/onizleme, yazim ve kalite denetimi.
+    solos: [(baslangic tick, bitis tick)] -> her zorlukta 'E solo' / 'E soloend' + 'Guitar Solo' bolumu."""
     tm, bar_ticks = ctx.tm, ctx.bar_ticks
     _progress(progress, lo, "Charting Hard / Medium / Easy")
     tracks = {"expert": expert, "hard": reduce_hard(expert, bar_ticks),
@@ -695,6 +700,12 @@ def finalize(ctx: ChartContext, expert: list[GNote], *, title: str, artist: str,
     end_tick = max(int(tm.time_to_tick(ctx.an.duration)), last_note_end + RES)
     res = ChartResult(text="", analysis=ctx.an, tracks=tracks, sp=sp, tempo_events=ctx.events, timesigs=ctx.ts,
                       sections=[(t, nm) for t, nm, _ in ctx.secs], end_tick=end_tick)
+    if solos:
+        res.solos = sorted(solos)
+        secs = {t: nm for t, nm in res.sections}
+        for a, _b in res.solos:
+            secs[a] = "Guitar Solo"
+        res.sections = sorted(secs.items())
     res.difficulty = estimate_difficulty(res)
     res.preview_ms = pick_preview_start(ctx.an)
     kw = dict(title=title, artist=artist, album=album, year=year, genre=genre, music_stream=music_stream)

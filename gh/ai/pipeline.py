@@ -35,6 +35,7 @@ class GuitarChartOutput:
     timings: dict = field(default_factory=dict)
     notes: list = field(default_factory=list)    # basic-pitch NoteEvent listesi (hata ayiklama / olcum)
     events: list = field(default_factory=list)   # GuitarEvent listesi
+    lead_regions: list = field(default_factory=list)   # [(t0, t1)] s: lead cizgisi cikarilan solo bolgeleri
 
 
 def resample_hq(x: np.ndarray, sr: int, target: int) -> np.ndarray:
@@ -134,16 +135,18 @@ def chart_with_guitar(samples: np.ndarray, sr: int, *, title: str = "Unknown", a
                      mix_onsets=[(o.time, o.strength) for o in an.onsets])
     act_t, act, gdb = activity(gi)
     pa = dsp.PitchAnalyzer(g22[:n] / max(float(np.abs(g22[:n]).max()), 1e-9))
-    events = build_events(gi, act_t, act, pa)
+    lead: list = []
+    events = build_events(gi, act_t, act, pa, lead_out=lead)
     stats = guitar_presence(events, act, gdb, an.duration)
     place(1.0)
     check_cancel(cancel)
-    out = GuitarChartOutput(result=None, mode="mix", sr=SR, stats=stats, notes=notes, events=events)
+    out = GuitarChartOutput(result=None, mode="mix", sr=SR, stats=stats, notes=notes, events=events,
+                            lead_regions=list(lead))
     diff = _sub(progress, "diff")
     res = None
     if stats.present:
         try:
-            res = generate_guitar(an, events, progress=diff, check=check, **meta)
+            res = generate_guitar(an, events, progress=diff, check=check, lead_regions=lead, **meta)
             out.mode = "guitar"
             out.guitar, out.backing = guitar, backing
         except (ValueError, RuntimeError) as exc:
