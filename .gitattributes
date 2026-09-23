@@ -1,0 +1,8 @@
+# ikili dosyalar: hicbir git ayarinda satir sonu donusumu yapilmasin
+*.onnx binary
+*.png binary
+*.ico binary
+*.ogg binary
+*.opus binary
+*.sng binary
+*.ps1 text eol=crlf
