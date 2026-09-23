@@ -6,8 +6,19 @@ dosyanin basindaki anahtarlar da kabul edilir). `fill_song_info(ini, info)` Song
 from __future__ import annotations
 
 import os
+import re
 
 from ..models import SongInfo
+
+_RICH_TAG = re.compile(r"</?(?:b|i|u|s|br|color|size|material|quad|sprite|align|alpha|mark|sup|sub)\b[^>]*>", re.I)
+
+
+def strip_rich_text(s: str) -> str:
+    """Clone Hero / Unity zengin metin etiketleri (<b>, <color=#..>, <size=..>, <br> ...) -> duz metin."""
+    if "<" not in s:
+        return s
+    s = re.sub(r"<br\s*/?>", " ", s, flags=re.I)
+    return re.sub(r"\s+", " ", _RICH_TAG.sub("", s)).strip()
 
 
 def decode_text(data: bytes) -> str:
@@ -84,10 +95,10 @@ def fill_song_info(ini: dict[str, str], info: SongInfo | None = None) -> SongInf
     info = info if info is not None else SongInfo()
     for key, attr in (("name", "name"), ("artist", "artist"), ("album", "album"),
                       ("genre", "genre"), ("year", "year")):
-        v = ini.get(key)
+        v = strip_rich_text(ini.get(key) or "")
         if v:
             setattr(info, attr, v)
-    charter = ini.get("charter") or ini.get("frets")
+    charter = strip_rich_text(ini.get("charter") or ini.get("frets") or "")
     if charter:
         info.charter = charter
     info.song_length_ms = _int(ini.get("song_length"), info.song_length_ms)

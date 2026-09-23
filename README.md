@@ -34,6 +34,7 @@ Herhangi bir şarkıyı (MP3, OGG, WAV, FLAC, OPUS) oyuna at, 4 zorluğun notala
 - Distorsiyonlu sololar (ritim gitarıyla aynı kanalda kalan lead) ayrıca tespit edilir: o bölümde chug yerine lead çizgisi çalınır ve bölüm **solo** olarak işaretlenir (solo yüzdesi / bonusu).
 - Belirgin gitar yoksa (ya da Ayarlar → *Gitar algılama* kapalıysa, şarkı 12 dk'dan uzunsa) eski yönteme döner: notalar **tüm miksin** ritmini ve melodisini izler (**OTO** rozeti, ayrı gitar kanalı yok).
 - Öneri: OGG/MP3, 44,1 kHz, şarkının tamamı (1–10 dk; sınır 10 sn–15 dk).
+- **Elle yapılmış chart (birebir senkron):** otomatik chart yaklaşık olur; topluluğun elle yaptığı chart'lar [Chorus Encore](https://www.enchor.us)'da. `tools\chorus_fetch.py "Sanatçı Şarkı"` en iyi eşleşmeyi (resmi oyunlardan çıkarılmış chart'lar hariç) indirip `Songs\` altına açar; paket chart'ın kendi sesini içerir. `--list` sonuçları gösterir, `--from-file liste.txt` satır satır toplu indirir, `--songs <klasör>` hedef. Kişisel kullanım içindir.
 - Ölçüm: `tools\benchmark_autochart.py` — demo şarkılarda el yapımı chart'a karşı miks yöntemi tempo hatası %0, Expert onset F1 0.81–0.91; gerçek gitar kanalıyla F1 0.97–1.00. `--synthetic`: distorsiyonlu sentetik rock miksi, `--real dosya.mp3`: gerçek şarkı raporu.
 
 ## Mekanik (Clone Hero / YARG değerleri)
