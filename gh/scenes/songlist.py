@@ -129,6 +129,8 @@ class SongListScene(Scene):
             d = {"UP": -1, "DOWN": 1, "LEFT": -VISIBLE, "RIGHT": VISIBLE}[action]
             if action in ("UP", "DOWN"):
                 self.index = (self.index + d) % len(self.songs)
+            elif self._multi_setlist():
+                self.index = self._setlist_jump(-1 if action == "LEFT" else 1)
             else:
                 self.index = max(0, min(len(self.songs) - 1, self.index + d))
             self.sfx("menu_move", 0.8)
@@ -143,6 +145,32 @@ class SongListScene(Scene):
             self.sfx("menu_select")
             self.app.settings.extra["last_song"] = self.sel.folder
             self.app.push(DifficultyScene(self.app, self))
+
+    def _multi_setlist(self) -> bool:
+        return len({s.setlist for s in self.songs}) > 1
+
+    def _setlist_jump(self, d: int) -> int:
+        """Sol / sag: onceki / sonraki setlist'in ilk sarkisi (setlist ortasindaysa once kendi basina)."""
+        cur = self.songs[self.index].setlist
+        start = self.index
+        while start > 0 and self.songs[start - 1].setlist == cur:
+            start -= 1
+        if d < 0:
+            if self.index != start:
+                return start
+            if start == 0:
+                return self._setlist_start(len(self.songs) - 1)
+            return self._setlist_start(start - 1)
+        i = self.index
+        while i < len(self.songs) and self.songs[i].setlist == cur:
+            i += 1
+        return i if i < len(self.songs) else 0
+
+    def _setlist_start(self, i: int) -> int:
+        cur = self.songs[i].setlist
+        while i > 0 and self.songs[i - 1].setlist == cur:
+            i -= 1
+        return i
 
     def update(self, dt: float) -> None:
         super().update(dt)
@@ -179,8 +207,16 @@ class SongListScene(Scene):
         surf.blit(shade, (0, 0))
         head = tc.glow(t("songs.title"), 42, (255, 214, 140), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (40, 14))
-        cnt = tc.render(t("songs.count", n=len(self.songs)), 18, TEXT_DIM)
-        surf.blit(cnt, (620 - cnt.get_width(), 38))
+        if self.songs and self._multi_setlist():
+            cur = self.sel.setlist
+            n_in = sum(1 for x in self.songs if x.setlist == cur)
+            grp = tc.render(upper(cur or t("songs.my_songs")), 20, NEON_CYAN, "ui", True)
+            cnt = tc.render(t("songs.count_group", n=n_in, total=len(self.songs)), 16, TEXT_DIM)
+            surf.blit(grp, (620 - grp.get_width(), 22))
+            surf.blit(cnt, (620 - cnt.get_width(), 48))
+        else:
+            cnt = tc.render(t("songs.count", n=len(self.songs)), 18, TEXT_DIM)
+            surf.blit(cnt, (620 - cnt.get_width(), 38))
         if not self.songs:
             draw_panel(surf, (140, 200, 1000, 260))
             m1 = tc.render(t("songs.none"), 34, TEXT, "ui", True)
@@ -206,6 +242,14 @@ class SongListScene(Scene):
             y = list_rect.y + 8 + (i - self.scroll) * ROW_H
             sel = i == self.index
             row = pygame.Rect(list_rect.x + 8, int(y), list_rect.w - 16, ROW_H - 6)
+            if i > 0 and self.songs[i - 1].setlist != s.setlist:
+                # setlist siniri: ince kehribar cizgi + setlist adi (sagda, kucuk)
+                ly = int(y) - 4
+                pygame.draw.line(surf, NEON_CYAN, (row.x + 6, ly), (row.right - 6, ly), 1)
+                tag = tc.render(s.setlist or t("songs.my_songs"), 12, NEON_CYAN, "ui", True)
+                tb = pygame.Rect(row.right - tag.get_width() - 18, ly - 8, tag.get_width() + 12, 16)
+                pygame.draw.rect(surf, (24, 20, 16), tb, border_radius=6)
+                surf.blit(tag, (tb.x + 6, tb.y + 1))
             if sel:
                 k = 0.5 + 0.5 * math.sin(self.t * 4)
                 hl = pygame.Surface(row.size, pygame.SRCALPHA)
@@ -308,8 +352,10 @@ class SongListScene(Scene):
             for k in range(5):
                 h = 6 + 10 * abs(math.sin(self.t * 6 + k * 1.3))
                 pygame.draw.rect(surf, NEON_PINK, (det.right - 60 + k * 8, det.bottom - 24 - h, 5, h))
-        hints = [("key.updown", "hint.move"), ("key.enter_green", "hint.select"), ("Tab", "hint.settings"),
-                 ("I", "hint.import")]
+        hints = [("key.updown", "hint.move")]
+        if self._multi_setlist():
+            hints.append(("key.leftright", "hint.setlist"))
+        hints += [("key.enter_green", "hint.select"), ("Tab", "hint.settings"), ("I", "hint.import")]
         if s.auto_chart:
             hints.append(("R", "hint.rechart"))
         hints.append(("key.esc_red", "hint.back"))

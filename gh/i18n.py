@@ -40,6 +40,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "key.esc_red": {"en": "Esc / Red", "tr": "Esc / Kırmızı"},
     "key.strum_space": {"en": "Strum / Space", "tr": "Strum / Space"},
     "hint.move": {"en": "Move", "tr": "Gezin"},
+    "hint.setlist": {"en": "Setlist", "tr": "Oyun / liste"},
     "hint.select": {"en": "Select", "tr": "Seç"},
     "hint.change": {"en": "Change", "tr": "Değiştir"},
     "hint.confirm": {"en": "Confirm", "tr": "Onayla"},
@@ -74,6 +75,8 @@ STRINGS: dict[str, dict[str, str]] = {
     # --- sarki listesi
     "songs.title": {"en": "SELECT SONG", "tr": "ŞARKI SEÇ"},
     "songs.count": {"en": "{n} songs", "tr": "{n} şarkı"},
+    "songs.count_group": {"en": "{n} songs · {total} total", "tr": "{n} şarkı · toplam {total}"},
+    "songs.my_songs": {"en": "My songs", "tr": "Şarkılarım"},
     "songs.none": {"en": "No songs found.", "tr": "Hiç şarkı bulunamadı."},
     "songs.none_hint": {"en": "Put Clone Hero song folders (notes.chart / notes.mid + song.ogg) into:",
                         "tr": "Clone Hero şarkı klasörlerini (notes.chart / notes.mid + song.ogg) şuraya koyun:"},

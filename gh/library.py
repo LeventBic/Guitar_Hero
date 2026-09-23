@@ -18,6 +18,17 @@ def song_roots() -> list[str]:
     return roots
 
 
+def setlist_of(root: str, folder: str) -> str:
+    """Sarki klasorunun Songs kokune gore ilk alt klasoru (setlist / oyun adi); dogrudan kokteyse ""."""
+    try:
+        rel = os.path.relpath(os.path.dirname(os.path.abspath(folder)), os.path.abspath(root))
+    except ValueError:
+        return ""
+    if rel in (".", "") or rel.startswith(".."):
+        return ""
+    return rel.replace("\\", "/").split("/")[0]
+
+
 class SongLibrary:
     def __init__(self):
         self.songs: list[SongInfo] = []
@@ -35,8 +46,10 @@ class SongLibrary:
                 if key in seen:
                     continue
                 seen.add(key)
+                info.setlist = setlist_of(root, info.folder)
                 out.append(info)
-        out.sort(key=lambda i: (i.name.lower(), i.artist.lower()))
+        # setlist'lere gore (kokteki sarkilar = "Sarkilarim" once), setlist icinde ada gore
+        out.sort(key=lambda i: (i.setlist != "", i.setlist.lower(), i.name.lower(), i.artist.lower()))
         self.songs = out
         return out
 

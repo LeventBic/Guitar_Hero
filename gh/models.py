@@ -114,6 +114,7 @@ class SongInfo:
     folder: str = ""
     chart_path: str = ""
     album_art: str = ""
+    setlist: str = ""                     # Songs altindaki ust klasor (ornek: "Guitar Hero III"); kok = ""
     stems: dict[str, str] = field(default_factory=dict)  # "song", "guitar", "rhythm", "bass", ... -> dosya yolu
 
 
