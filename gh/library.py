@@ -48,8 +48,12 @@ class SongLibrary:
                 seen.add(key)
                 info.setlist = setlist_of(root, info.folder)
                 out.append(info)
-        # setlist'lere gore (kokteki sarkilar = "Sarkilarim" once), setlist icinde ada gore
-        out.sort(key=lambda i: (i.setlist != "", i.setlist.lower(), i.name.lower(), i.artist.lower()))
+        # setlist'lere gore (kokteki sarkilar = "Sarkilarim" once; bilinen oyunlar cikis yilina, digerleri ada gore),
+        # setlist icinde ada gore
+        from .setlists import setlist_years
+        years = setlist_years()
+        out.sort(key=lambda i: (i.setlist != "", years.get(i.setlist.lower(), 9999), i.setlist.lower(),
+                                i.name.lower(), i.artist.lower()))
         self.songs = out
         return out
 

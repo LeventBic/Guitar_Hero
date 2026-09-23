@@ -17,8 +17,8 @@ class TitleScene(Scene):
     def __init__(self, app):
         super().__init__(app)
         self.bg = SynthBackground()
-        self.menu = MenuList(["title.play", "title.import", "title.calibration", "title.settings", "title.quit"],
-                             W // 2, 420, spacing=48, size=32)
+        self.menu = MenuList(["title.play", "title.import", "title.download", "title.calibration", "title.settings",
+                              "title.quit"], W // 2, 412, spacing=42, size=30)
         rng = random.Random(1)
         self.gems = [[rng.uniform(0, W), rng.uniform(0, 720), rng.uniform(40, 120), rng.randrange(5),
                       rng.uniform(0.5, 1.0)] for _ in range(18)]
@@ -46,9 +46,12 @@ class TitleScene(Scene):
                 from .importer import ImportScene
                 self.app.push(ImportScene(self.app))
             elif i == 2:
+                from .setlists import SetlistScene
+                self.app.push(SetlistScene(self.app))
+            elif i == 3:
                 from .calibration import CalibrationScene
                 self.app.push(CalibrationScene(self.app))
-            elif i == 3:
+            elif i == 4:
                 from .settings import SettingsScene
                 self.app.push(SettingsScene(self.app))
             else:

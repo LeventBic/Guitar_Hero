@@ -1,4 +1,4 @@
-"""GELISTIRME ARACI: Chorus Encore'dan (https://www.enchor.us, Clone Hero topluluk chart arama motoru) elle
+"""GELISTIRME ARACI (cekirdek: gh/chorus.py): Chorus Encore'dan (https://www.enchor.us, Clone Hero topluluk chart arama motoru) elle
 yapilmis chart indirip Songs klasorune acar. Paket (.sng) chart'i yapanin ses dosyasini da icerir; chart o sese
 gore yapildigi icin senkron birebirdir.
 
@@ -18,125 +18,24 @@ Songs/ git'e girmez. Servis bagisla ayakta: istekler arasinda bekleme var, toplu
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import re
 import sys
-import tempfile
 import time
-import unicodedata
-import urllib.error
-import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from gh.chart.sng import extract_sng  # noqa: E402
-from gh.chart.song_ini import strip_rich_text  # noqa: E402
+from gh import chorus  # noqa: E402
+from gh.chorus import describe, pick, search  # noqa: E402
 from gh.importer import fill_difficulties  # noqa: E402
 
-API = "https://api.enchor.us/search"
-FILES = "https://files.enchor.us/{md5}{suffix}.sng"
-UA = "RIFF-rhythm-game/1.0 (chorus_fetch.py)"
-OFFICIAL = {"harmonix", "neversoft", "vicarious visions", "freestylegames", "activision", "budcat", "beenox"}
 PAUSE_S = 1.5
 
 
-def _post(url: str, payload: dict) -> dict:
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", "User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
-
-
-def search(query: str, per_page: int = 25) -> list[dict]:
-    d = _post(API, {"search": query, "per_page": per_page, "page": 1, "instrument": "guitar",
-                    "difficulty": "expert", "drumType": None, "drumsReviewed": False, "sort": None,
-                    "source": "api"})
-    return d.get("data", [])
-
-
-def _norm(s: str) -> str:
-    s = unicodedata.normalize("NFKD", strip_rich_text(s or "")).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", " ", s).strip()
-
-
-def is_official(r: dict) -> bool:
-    return _norm(r.get("charter", "")) in OFFICIAL
-
-
-def pick(results: list[dict], query: str, allow_official: bool = False) -> dict | None:
-    words = set(_norm(query).split())
-    best = None
-    for r in results:
-        if not allow_official and is_official(r):
-            continue
-        name, artist = _norm(r.get("name", "")), _norm(r.get("artist", ""))
-        have = set(name.split()) | set(artist.split())
-        if not words <= have:
-            continue
-        # canli / cover / remix surumleri, sorguda istenmedikce geride
-        extra = {"live", "cover", "remix", "acoustic", "demo"} & (set(name.split()) - words)
-        score = (not extra, name == " ".join(w for w in _norm(query).split() if w in name.split()))
-        if best is None or score > best[0]:
-            best = (score, r)
-    return best[1] if best else None
-
-
-def describe(r: dict) -> str:
-    ln = int(r.get("song_length") or 0) // 1000
-    return (f"{strip_rich_text(r.get('artist', ''))} - {strip_rich_text(r.get('name', ''))}  "
-            f"[{strip_rich_text(r.get('charter', ''))}]  {ln // 60}:{ln % 60:02d}  diff {r.get('diff_guitar')}  "
-            f"md5 {r.get('md5')}{'  (OFFICIAL)' if is_official(r) else ''}")
-
-
-def _folder_name(meta_artist: str, meta_name: str) -> str:
-    s = f"{strip_rich_text(meta_artist)} - {strip_rich_text(meta_name)}".strip(" -")
-    s = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", s).rstrip(". ")
-    return s or "Chorus Song"
-
-
 def download(md5: str, songs_dir: str, name_hint: tuple[str, str] = ("", ""), no_video: bool = False) -> str:
-    """md5 paketini indir, Songs altinda '<Sanatci> - <Sarki>' klasorune ac (varsa ' (2)' ...).
-    no_video: klipsiz paket (<md5>_novideo.sng; sunucuda yoksa normal paket)."""
-    if not re.fullmatch(r"[0-9a-f]{32}", md5):
-        raise ValueError(f"bad md5: {md5}")
-    os.makedirs(songs_dir, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(suffix=".sng")
-    os.close(fd)
-    try:
-        for suffix in (("_novideo", "") if no_video else ("",)):
-            req = urllib.request.Request(FILES.format(md5=md5, suffix=suffix), headers={"User-Agent": UA})
-            try:
-                with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as f:
-                    while chunk := r.read(1 << 20):
-                        f.write(chunk)
-                break
-            except urllib.error.HTTPError as exc:
-                if exc.code != 404 or not suffix:
-                    raise
-        from gh.chart.sng import read_sng
-        meta, _files = read_sng(tmp)
-        base = _folder_name(meta.get("artist", name_hint[0]), meta.get("name", name_hint[1]))
-        dest = os.path.join(songs_dir, base)
-        k = 2
-        while os.path.exists(dest):
-            dest = os.path.join(songs_dir, f"{base} ({k})")
-            k += 1
-        extract_sng(tmp, dest)
-        made = fill_difficulties(dest)
-        if made:
-            print(f"FILLED     {', '.join(made)} (from the hand-made Expert)")
-        with open(os.path.join(dest, "song.ini"), "a", encoding="utf-8", newline="\n") as f:
-            f.write(f"chorus_md5 = {md5}\n")
-        return dest
-    finally:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
+    return chorus.download(md5, songs_dir, name_hint, no_video=no_video)
 
 
 def fetch(query: str, songs_dir: str, *, allow_official: bool = False, dry: bool = False,

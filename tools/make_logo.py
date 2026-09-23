@@ -39,6 +39,7 @@ a2 = np.maximum(a, solid)
 col = np.clip((rgb - bg * (1 - a[..., None])) / np.maximum(a[..., None], 1e-3), 0, 255)
 w = np.clip((solid - a) / 0.3, 0, 1)[..., None]          # doldurulan yerde orijinal (koyu) renge gecis
 col = col * (1 - w) + rgb * w
+col = np.where(a2[..., None] < 0.004, 0.0, col)             # gorunmez piksellerde renk yok (toplamali cizim icin)
 cols = (a2 > 0.35).sum(axis=1); rows = (a2 > 0.35).sum(axis=0)
 xs, ys = np.nonzero(cols > 3)[0], np.nonzero(rows > 3)[0]
 x0, x1 = max(0, xs.min() - 6), min(a.shape[0] - 1, xs.max() + 6)

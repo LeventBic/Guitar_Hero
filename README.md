@@ -9,7 +9,11 @@ Kaynak araştırma: `Levo-researches/` (LeventBic/Levo-Researches → `reports/o
 ## İndir ve oyna (Windows)
 1. [Releases](https://github.com/LeventBic/Guitar_Hero/releases/latest) sayfasından `GuitarHero-windows.zip`'i indir.
 2. Zip'i bir klasöre çıkar, `GuitarHero\GuitarHero.exe`'yi çalıştır (kurulum gerekmez; klasörün tamamı birlikte kalmalı).
-3. Kendi şarkını eklemek için MP3/OGG/FLAC dosyasını oyun penceresine sürükle (aşağıda: *Kendi şarkını ekle*).
+3. Şarkılar: ana menü → **SETLIST İNDİR** (ya da şarkı listesinde **D**). Guitar Hero serisinin 16 oyunluk setlist'i
+   (GH 2005 → GH Live 2015, 875 şarkı, ~10.8 GB) oyunun içinden tek tıkla indirilir; istediğin oyunu ya da hepsini seç.
+   Şarkılar Chorus Encore'dan senin bilgisayarına iner (repoda / zip'te şarkı yok; müzik ve chart'lar hak sahiplerine aittir).
+   Oyunu OneDrive / Dropbox gibi eşitlenen bir klasöre değil, örn. `C:\Oyunlar\GuitarHero`'ya çıkarman önerilir.
+4. Kendi şarkını eklemek için MP3/OGG/FLAC dosyasını oyun penceresine sürükle (aşağıda: *Kendi şarkını ekle*).
 
 ## Kaynaktan çalıştırma
 Python 3.14 (Windows) gerekir.
@@ -65,6 +69,7 @@ Herhangi bir şarkıyı (MP3, OGG, WAV, FLAC, OPUS) oyuna at, 4 zorluğun notala
 .\.venv\Scripts\python.exe main.py --song "Songs\RIFF Demo Band - Voltage Run" --diff expert --autoplay
 .\.venv\Scripts\python.exe tools\make_demo_songs.py     # demo şarkıları yeniden üret (~11 s)
 .\.venv\Scripts\python.exe main.py --import sarki.mp3 --smoke   # headless: şarkı ekle + bot ile oynat
+.\.venv\Scripts\python.exe main.py --download-setlist gh3        # headless setlist indirme (all = hepsi, --limit N)
 .\.venv\Scripts\python.exe tools\benchmark_autochart.py # otomatik chart ölçümü (demo miksler vs el yapımı chart)
 powershell -ExecutionPolicy Bypass -File build.ps1      # test + ikon + PyInstaller -> dist\GuitarHero\GuitarHero.exe
 ```

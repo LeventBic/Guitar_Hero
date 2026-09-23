@@ -310,17 +310,21 @@ def draw_title_logo(surf, assets, center, width=560, t=0.0) -> None:
     x = center[0] - img.get_width() // 2
     y = center[1] - img.get_height() // 2
     surf.blit(img, (x, y))
-    # alev titremesi: logonun sicak tonlu, karartilmis kopyasi toplamali ve degisken siddetle (bir kez hazirlanir)
-    glow = _LOGO_GLOW.get(id(img))
-    if glow is None:
-        glow = img.copy()
-        glow.fill((70, 34, 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    # alev titremesi: logonun alfa ile carpilmis, sicak tonlu kopyasi toplamali (4 siddet seviyesi, bir kez hazirlanir;
+    # toplamali cizim alfayi yok saydigi icin saydam pikseller onceden siyaha indirilir)
+    levels = _LOGO_GLOW.get(id(img))
+    if levels is None:
+        base = img.premul_alpha()
+        levels = []
+        for k in (0.25, 0.5, 0.75, 1.0):
+            g = base.copy()
+            g.fill((int(70 * k), int(34 * k), 0, 255), special_flags=pygame.BLEND_RGBA_MULT)
+            levels.append(g)
         _LOGO_GLOW.clear()
-        _LOGO_GLOW[id(img)] = glow
+        _LOGO_GLOW[id(img)] = levels
     k = max(0.0, math.sin(t * 7.0) * math.sin(t * 2.3))
-    if k > 0.05:
-        glow.set_alpha(int(255 * k))
-        surf.blit(glow, (x, y), special_flags=pygame.BLEND_ADD)
+    if k > 0.1:
+        surf.blit(levels[min(3, int(k * 4))], (x, y), special_flags=pygame.BLEND_ADD)
 
 
 _LOGO_GLOW: dict = {}

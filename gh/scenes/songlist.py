@@ -74,6 +74,12 @@ class SongListScene(Scene):
         self.preview_started = False
 
     def on_shortcut(self, key: int) -> None:
+        if key == pygame.K_d:
+            from .setlists import SetlistScene
+            self.sfx("menu_select")
+            self.app.audio.stop_preview(150)
+            self.app.push(SetlistScene(self.app))
+            return
         if key == pygame.K_i:
             from .importer import ImportScene
             self.sfx("menu_select")
@@ -355,7 +361,8 @@ class SongListScene(Scene):
         hints = [("key.updown", "hint.move")]
         if self._multi_setlist():
             hints.append(("key.leftright", "hint.setlist"))
-        hints += [("key.enter_green", "hint.select"), ("Tab", "hint.settings"), ("I", "hint.import")]
+        hints += [("key.enter_green", "hint.select"), ("Tab", "hint.settings"), ("I", "hint.import"),
+                  ("D", "hint.setlists")]
         if s.auto_chart:
             hints.append(("R", "hint.rechart"))
         hints.append(("key.esc_red", "hint.back"))

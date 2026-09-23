@@ -128,7 +128,8 @@ def scan_songs(root: str | os.PathLike, errors: list[tuple[str, str]] | None = N
     if not os.path.isdir(root):
         return result
     for dirpath, dirnames, _filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d.lower() not in SKIP_DIRS)
+        # _Import gibi ayrilmis klasorler ve indirme sirasindaki gecici '.<md5>.part' klasorleri sarki degildir
+        dirnames[:] = sorted(d for d in dirnames if d.lower() not in SKIP_DIRS and not d.startswith("."))
         files = _listing(dirpath)
         if not any(n in files for n in CHART_NAMES):
             continue

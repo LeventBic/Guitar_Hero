@@ -7,6 +7,7 @@ Kullanim:
   python main.py --screenshot out.png --at 42.5 --song .. [--diff ..]   oyun karesi (bot durumu o ana kadar)
   python main.py --screenshot-menu out.png          baslik + sarki listesi + diger menu ekranlari
   python main.py --import sarki.mp3 [--smoke]       headless: ses dosyasini ekle (otomatik chart), istenirse bot oynasin
+  python main.py --download-setlist gh3 [--limit N] [--songs-dir D]   hazir setlist'i Chorus'tan indir (all = hepsi)
 """
 from __future__ import annotations
 
@@ -34,7 +35,41 @@ def parse_args(argv=None):
     p.add_argument("--import", dest="import_paths", nargs="+", metavar="PATH",
                    help="headless: import audio files / folders into Songs (auto-chart); with --smoke the bot "
                         "then plays the imported songs")
+    p.add_argument("--download-setlist", metavar="ID", help="headless: download a ready-made setlist from Chorus "
+                   "Encore into Songs (ids: gh1 gh2 gh80s gh3 ... ghl, or 'all'); installed songs are skipped")
+    p.add_argument("--limit", type=int, default=0, help="with --download-setlist: download at most N songs")
+    p.add_argument("--songs-dir", default=None, help="with --download-setlist: target Songs folder")
     return p.parse_args(argv)
+
+
+def download_setlist(args) -> int:
+    """Oyun ici 'Setlist indir' ekraninin headless karsiligi (ayni gh.setlists.Downloader)."""
+    from gh.chorus import installed_md5s
+    from gh.importer import songs_dir
+    from gh.setlists import Downloader, fmt_size, load_setlists, pending_jobs
+    lists = load_setlists()
+    want = args.download_setlist.lower()
+    sel = lists if want == "all" else [s for s in lists if s.id == want]
+    if not sel:
+        print("unknown setlist; ids: " + ", ".join(s.id for s in lists) + ", all", file=sys.stderr)
+        return 2
+    root = args.songs_dir or songs_dir()
+    jobs = pending_jobs(sel, installed_md5s(root))
+    if args.limit:
+        jobs = jobs[:args.limit]
+    print(f"{len(jobs)} songs ({fmt_size(sum(j.song.size for j in jobs))}) -> {root}")
+    d = Downloader(jobs, root)
+    d.start()
+    last = -1
+    while not d.finished:
+        if d.ok + len(d.failed) != last:
+            last = d.ok + len(d.failed)
+            print(f"  {last}/{len(jobs)}  {fmt_size(d.bytes_now)}", flush=True)
+        time.sleep(0.3)
+    for job, err in d.failed:
+        print(f"FAILED {job.song.artist} - {job.song.name}: {err}")
+    print(f"done: {d.ok} ok, {len(d.failed)} failed")
+    return 0 if not d.failed else 1
 
 
 def _pick_diff(chart, want):
@@ -167,6 +202,8 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     headless_mode = bool(args.smoke or args.screenshot or args.screenshot_menu or args.import_paths)
     try:
+        if args.download_setlist:
+            return download_setlist(args)
         return run_headless(args) if headless_mode else run_game(args)
     except SystemExit:
         raise

@@ -101,9 +101,9 @@ def test_language_switch_changes_title_menu_and_is_saved():
     title = TitleScene(app)
     app.push(title)
     i18n.set_language("en")
-    assert [i18n.t(k) for k in title.menu.items] == ["PLAY", "IMPORT SONG", "CALIBRATION", "SETTINGS", "QUIT"]
+    assert [i18n.t(k) for k in title.menu.items] == ["PLAY", "IMPORT SONG", "DOWNLOAD SETLISTS", "CALIBRATION", "SETTINGS", "QUIT"]
     i18n.set_language("tr")
-    assert [i18n.t(k) for k in title.menu.items] == ["OYNA", "ŞARKI EKLE", "KALİBRASYON", "AYARLAR", "ÇIKIŞ"]
+    assert [i18n.t(k) for k in title.menu.items] == ["OYNA", "ŞARKI EKLE", "SETLIST İNDİR", "KALİBRASYON", "AYARLAR", "ÇIKIŞ"]
     # ayarlar: ilk secilebilir satir dil secimi; Saga -> diger dil, hemen uygulanir ve kaydedilir
     st = SettingsScene(app)
     app.push(st)

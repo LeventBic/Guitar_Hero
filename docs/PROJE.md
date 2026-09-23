@@ -150,7 +150,20 @@ paneller, alev turuncu / kehribar / bronz palet, alev parlamalı logo. Arayüz �
 ### 4.6 Şarkı kütüphanesi ve setlist'ler
 `Songs\` altındaki her üst klasör bir **setlist**'tir (örn. `Songs\Guitar Hero III - Legends of Rock\...`).
 Şarkı listesi setlist'lere göre gruplanır; kökteki şarkılar "Şarkılarım" olarak en başta; sol / sağ ok
-setlist'ler arasında atlar.
+setlist'ler arasında atlar. Bilinen oyunlar çıkış yılına göre sıralanır.
+
+### 4.7 Oyun içi setlist indirici
+- Ana menü → **SETLIST İNDİR** (şarkı listesinde **D**): Guitar Hero serisinin 16 ana setlist'i (GH 2005 … GH Live 2015,
+  875 şarkı, ~10.8 GB) ve "Tüm setlist'ler" satırı; her satırda kurulu / toplam şarkı ve inecek boyut.
+- Liste `assets/setlists.json`'da (**yalnız meta veri**, 110 KB): oyun, yıl, klasör; şarkı başına Chorus md5, sanatçı, ad,
+  süre, paket boyutu. Şarkılar oyuncunun isteğiyle Chorus Encore'dan (`files.enchor.us/<md5>_novideo.sng`) oyuncunun kendi
+  `Songs\<oyun>` klasörüne iner.
+- `gh/chorus.py` (indirme çekirdeği; `tools/chorus_fetch.py` de kullanır): paket geçici `.<md5>.part` klasörüne açılır,
+  eksik zorluklar doldurulur, `song.ini`'ye `chorus_md5` yazılır, tek adımda yerine taşınır → iptal / hata yarım klasör
+  bırakmaz; kurulu md5'ler atlanır (kaldığı yerden devam).
+- `gh/setlists.py` `Downloader`: arka plan iş parçacığı, şarkı başına 3 deneme, şarkılar arası kısa bekleme (servisi
+  yormamak için), hız / kalan süre, Esc ile iptal; disk alanı önceden kontrol edilir.
+- Headless: `main.py --download-setlist <id|all> [--limit N] [--songs-dir D]`.
 
 ---
 
@@ -167,6 +180,7 @@ setlist'ler arasında atlar.
 | `.sng` biçimi | [mdsitton/SngFileFormat](https://github.com/mdsitton/SngFileFormat) | belge | — |
 | Topluluk chart'ları (ör. Metallica "One" — DeltaOm3ga) | Chorus Encore | chart'ı yapanın; ses hak sahibinin | **hayır**, yalnız kullanıcının bilgisayarında |
 | Resmi oyun chart'ları (Guitar Hero serisi, GH Live) | Chorus Encore (oyunlardan çıkarılmış) | Activision / Harmonix vb. telifli | **hayır**, yalnız kullanıcının bilgisayarında |
+| Setlist listesi `assets/setlists.json` (meta veri) | Chorus Encore arama / gelişmiş arama API'si (charter + oyun paketi) | yalnız ad / sanatçı / md5 / boyut; kullanıcı kararıyla repoda (KARARLAR D19) | evet |
 | Otomatik chart araştırması | [CloneCharter](https://github.com/TheJorseman/CloneCharter), [audio2chart](https://www.arxiv.org/abs/2511.03337), [OCTAVE](https://octavestudio.tools/guide/auto-chart) | referans | — |
 
 Paketlenen kütüphanelerin lisans metinleri: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) (exe klasörüne de
@@ -174,7 +188,8 @@ kopyalanır).
 
 **Telif ilkesi:** Repoya ve GitHub sürümlerine yalnız bizim kodumuz, açık lisanslı modeller / klipler ve özgün
 demo şarkılar girer. Chorus'tan indirilen her şey (ses + chart + klip) `Songs\` altında kalır; `Songs/` git dışıdır
-ve `build.ps1 -Zip` dağıtım paketine yalnız demo şarkıları koyar.
+ve `build.ps1 -Zip` dağıtım paketine yalnız demo şarkıları koyar. Setlist indirici yalnız şarkı listesini taşır; dosyaları
+her oyuncu kendi bilgisayarına Chorus'tan indirir.
 
 ---
 
@@ -215,6 +230,7 @@ gh release create vX.Y.Z dist\GuitarHero-windows.zip --title "Guitar Hero vX.Y.Z
 .\.venv\Scripts\python.exe tools\chorus_fetch.py --from-file liste.txt --no-video --songs <klasör>
 .\.venv\Scripts\python.exe tools\chorus_fetch.py --fill "<şarkı klasörü>"       # eksik zorlukları üret
 .\.venv\Scripts\python.exe main.py --import sarki.mp3 --smoke                    # otomatik chart + bot
+.\.venv\Scripts\python.exe main.py --download-setlist gh3 --limit 5            # oyun içi indiricinin headless hâli
 ```
 
 ### Modelleri yeniden üretme (yalnız gerekirse)
@@ -250,6 +266,9 @@ oyun ve testler için gerekmez, dosyalar repoda.
 | Arka plan videosu + Pexels klipleri | `afc37ba`, `8c46aaa`, `73b268c` |
 | Guitar Hero tarzı arayüz | `b62a428` |
 | Setlist'lere göre şarkı listesi | `50e2460` |
+| Belgeler, tuş atama / F3 düzeltmeleri, v1.1.0 | `4646a6d`, `3fc3284`, `ca4f145` |
+| Ad "Guitar Hero" + logo (2026-09-24) | `02cec36` |
+| Oyun içi setlist indirici, v1.2.0 | (bu sürüm) |
 
 ---
 
@@ -258,6 +277,5 @@ oyun ve testler için gerekmez, dosyalar repoda.
   Chorus'taki elle yapılmış chart tercih edilmeli.
 - Gitar çok zayıf ayrışırsa (ör. demo şarkılardaki sentez gitar) otomatik chart seyrek kalabilir.
 - Otomatik bölüm adları miks analizinden gelir ("Verse 1 … N").
-- Setlist'ler alfabetik sıralanır (çıkış yılına göre değil).
 - Gerçek bir gitar kontrolcüsüyle donanım testi yapılmadı.
-- GitHub'daki v1.0.0 sürümü yeni arayüzden / videodan önce; yeni bir sürüm yayınlanmalı.
+- Resmi oyun setlist'leri telifli; depo herkese açılırsa şikâyetle kaldırılabilir (KARARLAR D18, D19).

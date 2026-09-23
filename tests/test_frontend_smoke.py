@@ -131,6 +131,12 @@ def test_menu_navigation_keyboard_only(app):
     _press(app, pygame.K_ESCAPE)
     assert isinstance(app.top, TitleScene)
     _press(app, pygame.K_DOWN)
+    _press(app, pygame.K_RETURN)          # DOWNLOAD SETLISTS
+    from gh.scenes import SetlistScene
+    assert isinstance(app.top, SetlistScene) and app.top.mode == "browse"
+    _press(app, pygame.K_ESCAPE)
+    assert isinstance(app.top, TitleScene)
+    _press(app, pygame.K_DOWN)
     _press(app, pygame.K_DOWN)
     _press(app, pygame.K_RETURN)
     assert isinstance(app.top, SettingsScene)
