@@ -70,7 +70,10 @@ class App:
             return
         pygame.display.set_caption(GAME_TITLE)
         try:
-            icon = pygame.image.load(os.path.join(resource_root(), "assets", "icon.png"))
+            # pencere / gorev cubugu kucuk gosterir: "GH" monogrami (tam logo bu boyutta okunmaz)
+            small = os.path.join(resource_root(), "assets", "icon_small.png")
+            icon = pygame.image.load(small if os.path.isfile(small) else
+                                     os.path.join(resource_root(), "assets", "icon.png"))
             pygame.display.set_icon(icon)
         except Exception:
             pass
