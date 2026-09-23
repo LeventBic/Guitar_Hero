@@ -159,12 +159,14 @@ class SongListScene(Scene):
             start = s.preview_start_ms / 1000.0 if s.preview_start_ms > 0 else 20.0
             self.app.audio.play_preview(path, start)
 
-    def _auto_badge(self, surf, right: int, y: int) -> int:
-        """Sag kenari `right` olan kucuk 'AUTO' rozeti; rozetin sol kenarini dondurur."""
-        img = self.assets.text.render(t("songs.auto"), 13, (20, 14, 30), "ui", True)
+    def _auto_badge(self, surf, right: int, y: int, mode: str = "") -> int:
+        """Sag kenari `right` olan kucuk rozet: 'GITAR' (ayristirilan gitardan chart) ya da 'OTO' (miksten);
+        rozetin sol kenarini dondurur."""
+        guitar = mode == "guitar"
+        img = self.assets.text.render(t("songs.guitar" if guitar else "songs.auto"), 13, (20, 14, 30), "ui", True)
         r = pygame.Rect(0, y, img.get_width() + 14, 22)
         r.right = right
-        pygame.draw.rect(surf, NEON_CYAN, r, border_radius=6)
+        pygame.draw.rect(surf, NEON_ORANGE if guitar else NEON_CYAN, r, border_radius=6)
         surf.blit(img, (r.x + 7, r.centery - img.get_height() // 2))
         return r.x - 10
 
@@ -218,7 +220,7 @@ class SongListScene(Scene):
                 surf.blit(ln, (right - ln.get_width(), row.y + 16))
                 right -= ln.get_width() + 12
             if s.auto_chart:
-                right = self._auto_badge(surf, right, row.y + 15)
+                right = self._auto_badge(surf, right, row.y + 15, s.auto_chart_mode)
             maxw = right - (row.x + 14) - 8
             if n.get_width() > maxw > 40:
                 n = n.subsurface((0, 0, maxw, n.get_height()))

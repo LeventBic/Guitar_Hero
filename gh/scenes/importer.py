@@ -45,6 +45,11 @@ class Job:
         self.stage = ""
         self.progress = 0.0
         self.result = ""
+        self.ai = False               # gitar kalibrasyonu (yapay zeka) ile isleniyor
+        self.info: dict = {}          # importer'in doldurdugu {'mode', 'notice', 'timings'}
+        self.started = 0.0
+        self.finished = 0.0
+        self.eta = -1.0               # yumusatilmis kalan sure tahmini (s)
 
 
 def _jobs_for(paths, from_inbox=False) -> list[Job]:
@@ -96,19 +101,25 @@ class ImportScene(Scene):
         if self.worker is not None and self.worker.is_alive():
             return
         self.cancel = False
+        self.cancel_event = threading.Event()
         self.started_at = time.perf_counter()
         self.worker = threading.Thread(target=self._run, name="riff-import", daemon=True)
         self.worker.start()
 
     def _run(self) -> None:
-        from ..importer import ImportFailed, import_audio, import_song_folder, rechart_song, songs_dir
+        from ..ai.runtime import Cancelled
+        from ..importer import ImportFailed, ai_available, import_audio, import_song_folder, rechart_song, songs_dir
         root = songs_dir()
+        use_ai = bool(self.app.settings.extra.get("guitar_ai", True))
+        ai_ok = use_ai and ai_available()[0]
         while True:
             job = next((j for j in self.jobs if j.status == "queued"), None)
             if job is None or self.cancel:
                 break
             job.status = "running"
             job.stage = "Starting"
+            job.ai = ai_ok and job.kind in ("audio", "rechart")
+            job.started = time.perf_counter()
 
             def prog(f, text, job=job):
                 job.progress = f
@@ -116,13 +127,16 @@ class ImportScene(Scene):
 
             try:
                 if job.kind == "audio":
-                    job.result = import_audio(job.path, root, prog)
+                    job.result = import_audio(job.path, root, prog, use_ai=use_ai, cancel=self.cancel_event,
+                                              info=job.info)
                 elif job.kind == "folder":
                     job.result = import_song_folder(job.path, root, prog)
                 else:
-                    job.result = rechart_song(job.path, prog)
+                    job.result = rechart_song(job.path, prog, use_ai=use_ai, cancel=self.cancel_event, info=job.info)
                 job.status = "ok"
                 job.progress = 1.0
+                if job.info.get("notice"):
+                    job.msg_key = job.info["notice"]
                 if job.from_inbox:
                     try:
                         os.remove(job.path)
@@ -131,11 +145,14 @@ class ImportScene(Scene):
                             self.app.inbox_failed.add((os.path.normcase(job.path), os.path.getmtime(job.path)))
                         except OSError:
                             pass
+            except Cancelled:
+                job.status, job.message = "skipped", "cancelled"
             except ImportFailed as exc:
                 job.status, job.message = "error", str(exc)
                 job.msg_key, job.msg_params = exc.key, dict(exc.params)
             except Exception as exc:  # beklenmeyen hata: yine de kuyruk devam etsin
                 job.status, job.message = "error", f"{type(exc).__name__}: {exc}"
+            job.finished = time.perf_counter()
             if job.status == "error" and job.from_inbox:
                 try:
                     self.app.inbox_failed.add((os.path.normcase(job.path), os.path.getmtime(job.path)))
@@ -150,7 +167,7 @@ class ImportScene(Scene):
     def busy(self) -> bool:
         return self.worker is not None and self.worker.is_alive()
 
-    def wait(self, timeout: float = 120.0) -> None:
+    def wait(self, timeout: float = 900.0) -> None:
         """Testler/headless: is parcacigi bitene kadar bekle."""
         if self.worker is not None:
             self.worker.join(timeout)
@@ -189,6 +206,7 @@ class ImportScene(Scene):
     def update(self, dt: float) -> None:
         super().update(dt)
         self.bg.update(dt)
+        self._update_eta(dt)
         if self.mode == "work" and not self.busy and not any(j.status in ("queued", "running") for j in self.jobs):
             self.mode = "done"
             self.sel = 0
@@ -244,8 +262,13 @@ class ImportScene(Scene):
             self._inbox_t = -9.0
             self._add(_jobs_for(files, from_inbox=True))
         elif what == "cancel":
-            if any(j.status == "queued" for j in self.jobs):
+            if any(j.status in ("queued", "running") for j in self.jobs):
+                # Esc: gecerli sarki de durdurulur (ayristirma parca aralarinda iptal edilir, yarim klasor
+                # olusturulmaz), kuyruktakiler atlanir
                 self.cancel = True
+                ev = getattr(self, "cancel_event", None)
+                if ev is not None:
+                    ev.set()
                 self.sfx("menu_back")
                 self._say(t("imp.cancelling"))
         elif what == "play":
@@ -284,7 +307,7 @@ class ImportScene(Scene):
             img = tc.render(self.note[:110], 17, NEON_ORANGE, "ui", True)
             surf.blit(img, (W // 2 - img.get_width() // 2, 646))
         hints = [("key.leftright", "hint.select"), ("key.enter_green", "hint.ok")]
-        hints.append(("key.esc_red", "hint.cancel_rest" if self.mode == "work" else "hint.back"))
+        hints.append(("key.esc_red", "hint.cancel" if self.mode == "work" else "hint.back"))
         draw_hints(surf, a, hints)
 
     def _dashed_rect(self, surf, rect, color, dash=18, gap=12, width=3, phase=0.0) -> None:
@@ -423,6 +446,8 @@ class ImportScene(Scene):
             sub = t("imp.done_sub") if nok else t("imp.done_none")
             surf.blit(tc.render(sub, 20, TEXT_DIM, "ui"), (x, y))
             y += 40
+        elif cur is not None and cur.ai:
+            y = self._draw_calibration(surf, panel, cur, done, total)
         else:
             name = cur.name if cur else (self.jobs[done].name if done < len(self.jobs) else "")
             img = tc.render(name, 30, TEXT, "ui", True)
@@ -461,7 +486,7 @@ class ImportScene(Scene):
                 pygame.draw.rect(surf, NEON_CYAN, (tot.x, tot.y, max(6, int(tot.w * ov)), 6), border_radius=3)
             y += 26
         # is listesi
-        rows = 7 if self.mode == "done" else 6
+        rows = 7 if self.mode == "done" else (2 if (cur is not None and cur.ai) else 6)
         idx_cur = next((i for i, j in enumerate(self.jobs) if j.status in ("running", "queued")), len(self.jobs) - 1)
         first = max(0, min(idx_cur - 2, len(self.jobs) - rows))
         for j in self.jobs[first:first + rows]:
@@ -482,9 +507,135 @@ class ImportScene(Scene):
             elif j.status == "ok" and j.result:
                 msg = tc.render(t("imp.added", name=os.path.basename(j.result)[:70]), 16, OK_COL, "ui")
                 surf.blit(msg, (panel.right - 30 - msg.get_width(), y + 4))
+                mode = j.info.get("mode")
+                note = t(j.msg_key) if j.msg_key else (t("imp.guitar_ok") if mode == "guitar" else "")
+                if note:
+                    col = NEON_ORANGE if mode == "guitar" else (255, 200, 120)
+                    surf.blit(_fit(tc.render(note, 16, col, "ui"), panel.w - 110), (x + 52, y + 26))
+                    y += 20
             y += 34
             if y > panel.bottom - 30:
                 break
+
+    # ------------------------------------------------------------------ gitar kalibrasyonu paneli
+    @staticmethod
+    def _stage_index(stage_text: str) -> int:
+        from ..ai.pipeline import STAGES
+        if stage_text in STAGES:
+            return STAGES.index(stage_text)
+        if stage_text in ("Starting", "Reading tags", "Decoding audio", ""):
+            return -1
+        return len(STAGES)                     # dosyalar yaziliyor / bitti
+
+    @staticmethod
+    def _fmt_s(s: float) -> str:
+        s = max(0, int(round(s)))
+        return f"{s // 60}:{s % 60:02d}"
+
+    def _update_eta(self, dt: float) -> None:
+        cur = next((j for j in self.jobs if j.status == "running"), None)
+        if cur is None or not cur.ai or not cur.started:
+            return
+        el = time.perf_counter() - cur.started
+        f = cur.progress
+        if f < 0.04 or el < 2.0:
+            return
+        raw = el * (1.0 - f) / max(f, 1e-3)
+        cur.eta = raw if cur.eta < 0 else cur.eta + (raw - cur.eta) * min(1.0, dt * 0.8)
+        cur.eta = max(0.0, cur.eta)
+
+    def _draw_calibration(self, surf, panel: pygame.Rect, cur: Job, done: int, total: int) -> int:
+        """GITAR KALIBRASYONU: asama listesi, hareketli dalga + perde gem'leri, ilerleme cubugu, gecen/kalan sure."""
+        from ..ai.pipeline import STAGES
+        from ..config import FRET_COLORS
+        tc = self.assets.text
+        x, y = panel.x + 30, panel.y + 16
+        name = tc.render(cur.name, 24, TEXT, "ui", True)
+        cnt = tc.render(t("imp.song_n", i=self.jobs.index(cur) + 1, n=total), 17, TEXT_DIM, "ui")
+        surf.blit(_fit(name, panel.w - 90 - cnt.get_width()), (x, y))
+        surf.blit(cnt, (panel.right - 30 - cnt.get_width(), y + 4))
+        y += 34
+        k = 0.5 + 0.5 * math.sin(self.t * 3.0)
+        title = tc.glow(t("imp.cal_title"), 36, (255, 215, 150), "title", True, glow_color=NEON_ORANGE,
+                        radius=5 + int(3 * k))
+        surf.blit(title, (x - 6, y - 6))
+        el = time.perf_counter() - cur.started if cur.started else 0.0
+        rem = t("imp.remaining", t=self._fmt_s(cur.eta)) if cur.eta >= 0 else t("imp.estimating")
+        tim = tc.render(f"{t('imp.elapsed', t=self._fmt_s(el))}    {rem}", 19, NEON_CYAN, "ui", True)
+        surf.blit(tim, (panel.right - 30 - tim.get_width(), y + 12))
+        y += 52
+        surf.blit(_fit(tc.render(t("imp.cal_sub"), 17, TEXT_DIM, "ui"), panel.w - 60), (x, y))
+        y += 30
+        # asamalar (sol)
+        idx = self._stage_index(cur.stage)
+        row_h = 31
+        for i, key in enumerate(STAGES):
+            ry = y + i * row_h
+            cx, cy = x + 12, ry + 12
+            label = tc.render(stage(key) + ("..." if i == idx else ""), 19,
+                              TEXT if i <= idx else TEXT_DIM, "ui", i == idx)
+            if i < idx:
+                pygame.draw.circle(surf, OK_COL, (cx, cy), 10)
+                pygame.draw.lines(surf, (15, 30, 15), False, [(cx - 5, cy), (cx - 1, cy + 4), (cx + 5, cy - 4)], 3)
+            elif i == idx:
+                rr = 9 + int(3 * k)
+                pygame.draw.circle(surf, NEON_ORANGE, (cx, cy), rr, 3)
+                a = self.t * 5.0
+                pygame.draw.circle(surf, (255, 230, 180), (int(cx + 6 * math.cos(a)), int(cy + 6 * math.sin(a))), 3)
+            else:
+                pygame.draw.circle(surf, (70, 62, 100), (cx, cy), 9, 2)
+            surf.blit(label, (x + 34, ry + 1))
+        if idx < 0:
+            surf.blit(tc.render(t("imp.cal_prep") + "...", 16, TEXT_DIM, "ui"), (x + 34, y + 5 * row_h))
+        # hareketli gorsel (sag): kayan dalga formu + nabiz atan 5 perde gem'i
+        box = pygame.Rect(x + 520, y - 4, panel.right - 30 - (x + 520), 5 * row_h + 6)
+        bg = pygame.Surface(box.size, pygame.SRCALPHA)
+        pygame.draw.rect(bg, (18, 12, 36, 220), (0, 0, *box.size), border_radius=12)
+        mid = box.h * 0.36
+        n = 64
+        bw = box.w / n
+        for i in range(n):
+            ph = i * 0.41 + self.t * 7.0
+            amp = (0.35 + 0.65 * abs(math.sin(ph * 0.37))) * abs(math.sin(ph)) * (0.55 + 0.45 * math.sin(i * 0.13 + self.t))
+            h = max(2, int(amp * mid * 0.9))
+            lit = abs((i / n) - ((self.t * 0.35) % 1.0)) < 0.06
+            col = (255, 170, 90, 230) if lit else (120, 90, 200, 170)
+            pygame.draw.rect(bg, col, (int(i * bw) + 1, int(mid - h), max(1, int(bw) - 2), 2 * h), border_radius=2)
+        gy = int(box.h * 0.8)
+        for i in range(5):
+            gx = int(box.w * (i + 0.5) / 5)
+            pulse = max(0.0, math.sin(self.t * 4.0 - i * 1.1))
+            r = int(15 + 5 * pulse)
+            c = FRET_COLORS[i]
+            pygame.draw.circle(bg, (*c, 90), (gx, gy), r + 6)
+            pygame.draw.circle(bg, (*c, 255), (gx, gy), r)
+            pygame.draw.circle(bg, (255, 255, 255, 120 + int(120 * pulse)), (gx, gy), max(3, r // 3))
+        surf.blit(bg, box.topleft)
+        pygame.draw.rect(surf, (140, 100, 220), box, 2, border_radius=12)
+        y += 5 * row_h + 14
+        # ilerleme cubugu
+        bar = pygame.Rect(x, y, panel.w - 60, 26)
+        pygame.draw.rect(surf, (30, 24, 54), bar, border_radius=13)
+        frac = cur.progress
+        if frac > 0:
+            fr = bar.copy()
+            fr.w = max(26, int(bar.w * frac))
+            pygame.draw.rect(surf, NEON_ORANGE, fr, border_radius=13)
+            shine = pygame.Surface((fr.w, 8), pygame.SRCALPHA)
+            shine.fill((255, 255, 255, 60))
+            surf.blit(shine, (fr.x, fr.y + 3))
+            sx = fr.x + int((self.t * 260) % max(fr.w, 1))
+            pygame.draw.line(surf, (255, 240, 210), (sx, fr.y + 4), (sx, fr.bottom - 5), 3)
+        pygame.draw.rect(surf, (255, 190, 110), bar, 2, border_radius=13)
+        pct = tc.render(f"{int(frac * 100)}%", 16, TEXT, "ui", True)
+        surf.blit(pct, (bar.centerx - pct.get_width() // 2, bar.y + 3))
+        y += 34
+        if total > 1:
+            tot = pygame.Rect(x, y, panel.w - 60, 6)
+            pygame.draw.rect(surf, (30, 24, 54), tot, border_radius=3)
+            ov = (done + frac) / total
+            pygame.draw.rect(surf, NEON_CYAN, (tot.x, tot.y, max(6, int(tot.w * ov)), 6), border_radius=3)
+        return y + 18
 
     def _draw_buttons(self, surf) -> None:
         tc = self.assets.text

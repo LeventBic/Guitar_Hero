@@ -104,6 +104,8 @@ def fill_song_info(ini: dict[str, str], info: SongInfo | None = None) -> SongInf
         info.eighthnote_hopo = _bool(ini.get("eighthnote_hopo"))
     if "auto_chart" in ini:
         info.auto_chart = _bool(ini.get("auto_chart"))
+    if ini.get("auto_chart_mode"):
+        info.auto_chart_mode = ini["auto_chart_mode"].strip().lower()
     mn = _int(ini.get("multiplier_note"), None)
     if mn in (103, 116):
         info.multiplier_note = mn

@@ -36,6 +36,8 @@ class GNote:
     mask: int = 1
     length: int = 0
     section: int = -1
+    force_strum: bool = False     # dogal HOPO olacaksa bile strum (pena ile calinan hizli nota; .chart N 5)
+    chord: int = 0                # gitar transkripsiyonundan akor buyuklugu (0 = bilinmiyor, 1 tek nota, 2-3)
 
     @property
     def frets(self) -> list[int]:
@@ -184,11 +186,15 @@ def target_step(d: float) -> int:
 
 
 def assign_frets(values: list[float], nfrets: int, clarity: list[float] | None = None,
-                 fold: bool = False, window: int = 12, edge_cost: float = 0.15) -> list[int]:
+                 fold: bool = False, window: int = 12, edge_cost: float = 0.15, distinct_rank: bool = False,
+                 same_cost: float = 3.0, register: np.ndarray | None = None, register_weight: float = 0.5
+                 ) -> list[int]:
     """Bir deger dizisini (perde / ust zorluk perdesi) insan charter'i gibi perdelere esle.
 
     Kurallar (maliyetler): ayni deger -> ayni perde; yukari -> yukari perde; buyuklukle orantili adim;
     yerel araliktaki konum (yuksek notalar yuksek perdelerde); gereksiz buyuk sicrama ve kenar cezasi.
+    distinct_rank: yerel konum, penceredeki FARKLI degerler arasindaki sira (cok tekrar eden en alcak nota
+    -chug- ortaya itilmez, yesile yakin kalir).
     """
     N = len(values)
     if N == 0:
@@ -201,8 +207,14 @@ def assign_frets(values: list[float], nfrets: int, clarity: list[float] | None =
     for i in range(N):
         lo, hi = max(0, i - window), min(N, i + window + 1)
         seg = v[lo:hi]
+        if distinct_rank:
+            u = np.unique(seg)
+            pos[i] = (np.searchsorted(u, v[i]) / (u.size - 1) if u.size > 1 else 0.5) * (F - 1)
+            continue
         rank = (seg < v[i]).sum() + 0.5 * (seg == v[i]).sum()
         pos[i] = (rank / seg.size) * (F - 1)
+    if register is not None:     # mutlak yukseklik (0..1) ile karistir: alcak riff yesil tarafta kalsin
+        pos = (1 - register_weight) * pos + register_weight * np.clip(register, 0, 1) * (F - 1)
     frets = np.arange(F)
     INF = 1e18
     cost = np.full((N, F), INF)
@@ -221,7 +233,7 @@ def assign_frets(values: list[float], nfrets: int, clarity: list[float] | None =
         dd = b - a
         tc = np.zeros((F, F))
         if tgt == 0:
-            tc += 3.0 * w * (dd != 0) + 0.8 * w * np.abs(dd)
+            tc += same_cost * w * (dd != 0) + 0.8 * w * np.abs(dd)
         else:
             wrong = np.sign(dd) == -np.sign(tgt)
             flat = dd == 0
@@ -428,8 +440,8 @@ def _remap(notes: list[GNote], nfrets: int, chords: bool) -> None:
             n.mask = 1 << f
 
 
-def reduce_medium(expert: list[GNote], bar_ticks: set[int]) -> list[GNote]:
-    sel = [_copy(n) for n in _select(expert, bar_ticks, RES // 2, 0.52, 0.45)]
+def reduce_medium(expert: list[GNote], bar_ticks: set[int], target: float = 0.52) -> list[GNote]:
+    sel = [_copy(n) for n in _select(expert, bar_ticks, RES // 2, target, 0.45)]
     _remap(sel, 4, chords=True)
     _trim_sustains(sel)
     return sel
@@ -489,6 +501,17 @@ def place_star_power(notes: list[GNote], bar_ticks_sorted: list[int]) -> list[tu
 
 # --------------------------------------------------------------------------- yazici
 
+def _natural_hopo(prev: GNote | None, n: GNote) -> bool:
+    """gh.chart.hopo.natural_hopo ile ayni kural (.chart esigi HOPO_TICKS)."""
+    if prev is None or bin(n.mask).count("1") >= 2:
+        return False
+    if n.tick - prev.tick > HOPO_TICKS or n.mask == prev.mask:
+        return False
+    if bin(prev.mask).count("1") >= 2 and (prev.mask & n.mask):
+        return False
+    return True
+
+
 def _q(s: str) -> str:
     return str(s).replace('"', "'").replace("\n", " ").replace("\r", " ").strip()
 
@@ -519,9 +542,13 @@ def write_chart(res: ChartResult, *, title: str, artist: str, album: str = "", y
             continue
         L += [f"[{SECTION_NAMES[d]}]", "{"]
         rows = []
+        prev = None
         for n in notes:
             for f in n.frets:
                 rows.append((n.tick, 0, f"N {f} {n.length}"))
+            if n.force_strum and _natural_hopo(prev, n):
+                rows.append((n.tick, 0, "N 5 0"))       # dogal HOPO'yu strum'a cevir
+            prev = n
         for t, ln in res.sp.get(d, []):
             rows.append((t, 1, f"S 2 {ln}"))
         for t, _, s in sorted(rows):
@@ -615,21 +642,27 @@ def _progress(cb, frac, text):
             pass
 
 
-def generate(samples: np.ndarray, sr: int, *, title: str = "Unknown", artist: str = "Unknown",
-             album: str = "", year: str = "", genre: str = "", music_stream: str = "song.ogg",
-             progress=None, analysis: Analysis | None = None, check: bool = True) -> ChartResult:
-    def sub(lo, hi):
-        return lambda f, t: _progress(progress, lo + (hi - lo) * f, t)
+@dataclass
+class ChartContext:
+    """Analizden cikan ortak iskelet: tempo haritasi, olcu cizgileri, bolumler (miks ve gitar charter'i paylasir)."""
+    an: Analysis
+    events: list
+    ts: list
+    tm: TempoMap
+    shift: int
+    last_tick: int
+    bar_ticks_sorted: list
+    bar_ticks: set
+    secs: list                 # (tick, ad, kume)
+    section_ticks: list        # (baslangic, bitis, kume)
 
-    an = analysis if analysis is not None else analyze(samples, sr, progress=sub(0.0, 0.75))
-    _progress(progress, 0.76, "Building tempo map")
+
+def build_context(an: Analysis) -> ChartContext:
     events, ts, grid, shift = build_tempo_map(an)
     tm = tempo_map_from(events, ts)
     p = ts[1][0] // RES if len(ts) > 1 else 0
-    end_time = an.duration
-    last_tick = int(tm.time_to_tick(max(FIRST_NOTE_MIN + 1.0, end_time - 0.25)))
+    last_tick = int(tm.time_to_tick(max(FIRST_NOTE_MIN + 1.0, an.duration - 0.25)))
     bar_ticks_sorted = list(range(p * RES, last_tick + 8 * RES, 4 * RES))
-    bar_ticks = set(bar_ticks_sorted)
     # bolumler (grid tick'leri)
     secs = []
     for s in an.sections:
@@ -641,35 +674,43 @@ def generate(samples: np.ndarray, sr: int, *, title: str = "Unknown", artist: st
     for i, (t, _nm, cl) in enumerate(secs):
         nxt = secs[i + 1][0] if i + 1 < len(secs) else 10 ** 9
         section_ticks.append((t, nxt, cl))
+    return ChartContext(an=an, events=events, ts=ts, tm=tm, shift=shift, last_tick=last_tick,
+                        bar_ticks_sorted=bar_ticks_sorted, bar_ticks=set(bar_ticks_sorted), secs=secs,
+                        section_ticks=section_ticks)
 
-    _progress(progress, 0.8, "Charting Expert")
-    expert = make_expert(an, tm, shift, bar_ticks, section_ticks, last_tick)
-    if len(expert) < 8:
-        raise ValueError("could not find enough notes in this audio")
-    _progress(progress, 0.86, "Charting Hard / Medium / Easy")
+
+def finalize(ctx: ChartContext, expert: list[GNote], *, title: str, artist: str, album: str = "", year: str = "",
+             genre: str = "", music_stream: str = "song.ogg", progress=None, check: bool = True,
+             lo: float = 0.86) -> ChartResult:
+    """Expert -> Hard/Medium/Easy indirgeme, SP, [Events], zorluk/onizleme, yazim ve kalite denetimi."""
+    tm, bar_ticks = ctx.tm, ctx.bar_ticks
+    _progress(progress, lo, "Charting Hard / Medium / Easy")
     tracks = {"expert": expert, "hard": reduce_hard(expert, bar_ticks),
               "medium": reduce_medium(expert, bar_ticks), "easy": reduce_easy(expert, bar_ticks)}
-    sp = {d: place_star_power(tracks[d], bar_ticks_sorted) for d in DIFFS}
+    if len(tracks["medium"]) > 0.82 * len(tracks["hard"]):
+        # yogun 16'lik chart'larda Hard da 8'liklere iner; Medium belirgin sekilde seyrek kalsin
+        tracks["medium"] = reduce_medium(expert, bar_ticks, target=0.78 * len(tracks["hard"]) / max(len(expert), 1))
+    sp = {d: place_star_power(tracks[d], ctx.bar_ticks_sorted) for d in DIFFS}
     last_note_end = max(n.tick + n.length for n in expert)
-    end_tick = max(int(tm.time_to_tick(end_time)), last_note_end + RES)
-    res = ChartResult(text="", analysis=an, tracks=tracks, sp=sp, tempo_events=events, timesigs=ts,
-                      sections=[(t, nm) for t, nm, _ in secs], end_tick=end_tick)
+    end_tick = max(int(tm.time_to_tick(ctx.an.duration)), last_note_end + RES)
+    res = ChartResult(text="", analysis=ctx.an, tracks=tracks, sp=sp, tempo_events=ctx.events, timesigs=ctx.ts,
+                      sections=[(t, nm) for t, nm, _ in ctx.secs], end_tick=end_tick)
     res.difficulty = estimate_difficulty(res)
-    res.preview_ms = pick_preview_start(an)
-    res.text = write_chart(res, title=title, artist=artist, album=album, year=year, genre=genre,
-                           music_stream=music_stream)
+    res.preview_ms = pick_preview_start(ctx.an)
+    kw = dict(title=title, artist=artist, album=album, year=year, genre=genre, music_stream=music_stream)
+    res.text = write_chart(res, **kw)
     if check:
-        _progress(progress, 0.9, "Checking playability")
+        _progress(progress, lo + 0.4 * (1.0 - lo), "Checking playability")
         res.validation = validate(res.text)
         bad = [d for d, (ok, _m) in res.validation.items() if not ok]
         if bad:
-            # guvenli geri donus: sorunlu zorluklarda sustain ve akorlari sadelestir
+            # guvenli geri donus: sorunlu zorluklarda sustain, akor ve zorlanmis strum'lari sadelestir
             for d in bad:
                 for n in tracks[d]:
                     n.length = 0
                     n.mask = 1 << (n.frets[0] if n.frets else 0)
-            res.text = write_chart(res, title=title, artist=artist, album=album, year=year, genre=genre,
-                                   music_stream=music_stream)
+                    n.force_strum = False
+            res.text = write_chart(res, **kw)
             res.validation = validate(res.text)
             bad = [d for d, (ok, _m) in res.validation.items() if not ok]
             if bad:
@@ -677,6 +718,23 @@ def generate(samples: np.ndarray, sr: int, *, title: str = "Unknown", artist: st
                                    ", ".join(f"{d}: {res.validation[d][1]}" for d in bad))
     _progress(progress, 1.0, "Done")
     return res
+
+
+def generate(samples: np.ndarray, sr: int, *, title: str = "Unknown", artist: str = "Unknown",
+             album: str = "", year: str = "", genre: str = "", music_stream: str = "song.ogg",
+             progress=None, analysis: Analysis | None = None, check: bool = True) -> ChartResult:
+    def sub(lo, hi):
+        return lambda f, t: _progress(progress, lo + (hi - lo) * f, t)
+
+    an = analysis if analysis is not None else analyze(samples, sr, progress=sub(0.0, 0.75))
+    _progress(progress, 0.76, "Building tempo map")
+    ctx = build_context(an)
+    _progress(progress, 0.8, "Charting Expert")
+    expert = make_expert(an, ctx.tm, ctx.shift, ctx.bar_ticks, ctx.section_ticks, ctx.last_tick)
+    if len(expert) < 8:
+        raise ValueError("could not find enough notes in this audio")
+    return finalize(ctx, expert, title=title, artist=artist, album=album, year=year, genre=genre,
+                    music_stream=music_stream, progress=progress, check=check)
 
 
 def generate_chart(samples: np.ndarray, sr: int, *, title: str = "Unknown", artist: str = "Unknown",

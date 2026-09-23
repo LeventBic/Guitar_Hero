@@ -88,7 +88,9 @@ def import_files(app, paths: list[str], timeout: float = 600.0) -> list[dict]:
     app.stack = [scene]
     scene.enter()
     scene.wait(timeout)
-    out = [{"name": j.name, "ok": j.status == "ok", "folder": j.result, "message": j.message} for j in scene.jobs]
+    out = [{"name": j.name, "ok": j.status == "ok", "folder": j.result, "message": j.message,
+            "mode": j.info.get("mode", ""), "notice": j.info.get("notice", ""),
+            "timings": dict(j.info.get("timings", {}))} for j in scene.jobs]
     app.stack = []
     return out
 
@@ -164,7 +166,7 @@ def screenshot_menus(app, path: str, scale: float = 1.0) -> list[str]:
     _run_scene(app, imp, 0.5)
     save("import")
     demo = [("audio", "Artist - First Song.mp3", "ok", "", 1.0), ("audio", "Artist - Second Song.flac", "running",
-            "Finding notes", 0.62), ("audio", "Third Song.ogg", "queued", "", 0.0),
+            "Transcribing guitar notes", 0.76), ("audio", "Third Song.ogg", "queued", "", 0.0),
             ("audio", "broken file.wav", "error", "cannot decode audio (unsupported format)", 0.0)]
     imp.jobs = []
     for kind, name, status, stage, prog in demo:
@@ -172,6 +174,9 @@ def screenshot_menus(app, path: str, scale: float = 1.0) -> list[str]:
         j.status, j.stage, j.progress = status, stage, prog
         if status == "ok":
             j.result = os.path.join("Songs", "Artist - First Song")
+            j.info = {"mode": "guitar"}
+        if status == "running":
+            j.ai, j.started, j.eta = True, time.perf_counter() - 41.0, 13.0
         if status == "error":
             j.message, j.msg_key, j.msg_params = stage, "imp.err_decode", {"err": "unsupported format"}
         imp.jobs.append(j)
@@ -181,6 +186,10 @@ def screenshot_menus(app, path: str, scale: float = 1.0) -> list[str]:
     for j in imp.jobs:
         if j.status in ("running", "queued"):
             j.status, j.result = "ok", os.path.join("Songs", j.name)
+            if j.name.startswith("Third"):
+                j.info, j.msg_key = {"mode": "mix", "notice": "imp.no_guitar"}, "imp.no_guitar"
+            else:
+                j.info = {"mode": "guitar"}
     imp.mode, imp.sel = "done", 0
     app.draw(app.screen)
     save("import_done")

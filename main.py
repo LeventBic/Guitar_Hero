@@ -56,7 +56,15 @@ def run_headless(args) -> int:
     if args.import_paths:
         res = headless.import_files(app, args.import_paths)
         for r in res:
-            print(f"{'OK  ' if r['ok'] else 'FAIL'} {r['name']}: {r['folder'] or r['message']}")
+            extra = ""
+            if r["mode"]:
+                extra = f"  [mode {r['mode']}"
+                if r["notice"]:
+                    extra += f", {r['notice']}"
+                if r["timings"]:
+                    extra += f", {r['timings'].get('total', 0.0):.1f}s"
+                extra += "]"
+            print(f"{'OK  ' if r['ok'] else 'FAIL'} {r['name']}: {r['folder'] or r['message']}{extra}")
         imported = [r["folder"] for r in res if r["ok"]]
         if not imported:
             return 1
@@ -178,4 +186,6 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()       # PyInstaller exe: olasi alt surec calisanlari icin (gitar kalibrasyonu)
     sys.exit(main())

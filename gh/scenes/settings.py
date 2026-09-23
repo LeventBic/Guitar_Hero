@@ -49,6 +49,8 @@ class SettingsScene(Scene):
         R.append(("header", "set.h_general"))
         R.append(("choice", "set.language", i18n.get_language, self._set_language, [c for c, _ in i18n.LANGUAGES],
                   i18n.language_name))
+        R.append(("bool", "set.guitar_ai", lambda: bool(s.extra.get("guitar_ai", True)),
+                  lambda x: s.extra.__setitem__("guitar_ai", bool(x))))
         R.append(("header", "set.h_gameplay"))
         R.append(("num", "set.note_speed", lambda: v.note_speed, lambda x: setattr(v, "note_speed", x), 0.1, 0.5, 3.0,
                   lambda x: f"{x:.1f}x"))

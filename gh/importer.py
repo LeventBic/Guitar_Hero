@@ -20,13 +20,13 @@ import wave
 
 import numpy as np
 
-from .audio_meta import AudioMeta, meta_from_filename, read_metadata
+from .audio_meta import AudioMeta, clean_title, meta_from_filename, read_metadata
 
 AUDIO_EXTS = (".mp3", ".ogg", ".wav", ".flac", ".opus")
 INBOX_NAME = "_Import"
 MIN_SECONDS = 10.0
 MAX_SECONDS = 15 * 60.0
-AUTO_CHART_VERSION = 1
+AUTO_CHART_VERSION = 2          # 2: gitar kalibrasyonu (auto_chart_mode = guitar | mix)
 
 _decode_lock = threading.Lock()
 
@@ -132,7 +132,7 @@ def _ensure_mixer() -> None:
         pygame.mixer.init(44100, -16, 2, 1024)
 
 
-def _decode_wav(path: str) -> tuple[np.ndarray, int]:
+def _decode_wav(path: str, stereo: bool = False) -> tuple[np.ndarray, int]:
     with wave.open(path, "rb") as w:
         ch, sw, sr, n = w.getnchannels(), w.getsampwidth(), w.getframerate(), w.getnframes()
         raw = w.readframes(n)
@@ -150,11 +150,12 @@ def _decode_wav(path: str) -> tuple[np.ndarray, int]:
     else:
         raise ImportFailed(f"unsupported WAV sample width ({sw * 8} bit)", "imp.err_decode",
                            err=f"WAV {sw * 8} bit")
-    return a.reshape(-1, ch).mean(axis=1), sr
+    a = a.reshape(-1, ch)
+    return (a if stereo else a.mean(axis=1)), sr
 
 
-def decode_audio(path: str) -> tuple[np.ndarray, int]:
-    """Dosyayi mono float32'ye coz. (ornekler, sr)."""
+def decode_audio(path: str, stereo: bool = False) -> tuple[np.ndarray, int]:
+    """Dosyayi float32'ye coz: mono (L,) ya da stereo=True ise (L, kanal). (ornekler, sr)."""
     err = None
     try:
         import pygame
@@ -170,17 +171,17 @@ def decode_audio(path: str) -> tuple[np.ndarray, int]:
         if np.issubdtype(a.dtype, np.integer):
             scale = float(max(abs(np.iinfo(a.dtype).min), np.iinfo(a.dtype).max))
             if a.dtype == np.uint8:
-                mono = (a.astype(np.float32).mean(axis=1) - 128.0) / 128.0
+                f = (a.astype(np.float32) - 128.0) / 128.0
             else:
-                mono = a.astype(np.float32).mean(axis=1) / scale
+                f = a.astype(np.float32) / scale
         else:
-            mono = a.astype(np.float32).mean(axis=1)
-        return mono, int(freq)
+            f = a.astype(np.float32)
+        return (f if stereo else f.mean(axis=1)), int(freq)
     except Exception as exc:  # pygame yok / ses aygiti yok / bicim desteklenmiyor
         err = exc
     if path.lower().endswith(".wav"):
         try:
-            return _decode_wav(path)
+            return _decode_wav(path, stereo)
         except ImportFailed:
             raise
         except Exception:
@@ -223,7 +224,8 @@ def resolve_meta(path: str) -> AudioMeta:
             meta.artist = f_artist
     elif not meta.artist:
         meta.artist = f_artist
-    meta.title = meta.title or "Unknown Song"
+    meta.title = clean_title(meta.title) or "Unknown Song"
+    meta.artist = clean_title(meta.artist)
     return meta
 
 
@@ -231,14 +233,18 @@ def _ini_escape(v: str) -> str:
     return str(v).replace("\r", " ").replace("\n", " ").strip()
 
 
+LOADING_PHRASES = {"guitar": "Auto-charted by RIFF from the separated guitar part.",
+                   "mix": "Auto-charted by RIFF: the notes follow the whole mix."}
+
+
 def write_song_ini(path: str, meta: AudioMeta, *, length_ms: int, preview_ms: int, diff: int,
-                   source: str = "", extra: dict | None = None) -> None:
+                   source: str = "", extra: dict | None = None, mode: str = "mix") -> None:
     lines = ["[song]", f"name = {_ini_escape(meta.title)}", f"artist = {_ini_escape(meta.artist or 'Unknown Artist')}",
              f"album = {_ini_escape(meta.album)}", f"genre = {_ini_escape(meta.genre)}",
              f"year = {_ini_escape(meta.year)}", "charter = RIFF Auto", f"song_length = {int(length_ms)}",
              f"preview_start_time = {int(preview_ms)}", f"diff_guitar = {int(diff)}", "delay = 0",
-             "auto_chart = 1", f"auto_chart_version = {AUTO_CHART_VERSION}",
-             "loading_phrase = Auto-charted by RIFF: the notes follow the whole mix."]
+             "auto_chart = 1", f"auto_chart_version = {AUTO_CHART_VERSION}", f"auto_chart_mode = {mode}",
+             f"loading_phrase = {LOADING_PHRASES.get(mode, LOADING_PHRASES['mix'])}"]
     if source:
         lines.append(f"auto_chart_source = {_ini_escape(source)}")
     for k, v in (extra or {}).items():
@@ -308,19 +314,109 @@ def _chart_audio(samples, sr, meta: AudioMeta, stream: str, progress, lo=0.15, h
                     year=meta.year, genre=meta.genre, music_stream=stream, progress=sub)
 
 
-def import_audio(path: str, songs_root: str, progress=None) -> str:
-    """Ses dosyasini ice aktar; yeni sarki klasorunun yolunu dondur."""
+# --------------------------------------------------------------------------- gitar kalibrasyonu (yapay zeka)
+
+def ai_available() -> tuple[bool, str]:
+    """Gitar algilama modelleri + onnxruntime hazir mi."""
+    try:
+        from .ai import models_available
+        return models_available()
+    except Exception as exc:  # pragma: no cover - bozuk kurulum
+        return False, str(exc)
+
+
+def stem_ext() -> str:
+    """Ayristirilan stem'lerin bicimi: libsndfile (soundfile) varsa Ogg Vorbis, yoksa 16 bit WAV."""
+    try:
+        import soundfile as sf
+        return ".ogg" if "OGG" in sf.available_formats() else ".wav"
+    except Exception:
+        return ".wav"
+
+
+def write_stem(path_noext: str, data: np.ndarray, sr: int, ext: str | None = None) -> str:
+    """(kanal, L) veya (L,) float -> <yol>.ogg (Vorbis, ~q0.5) ya da .wav (16 bit). Atomik: gecici dosya + replace."""
+    ext = ext or stem_ext()
+    a = np.asarray(data, dtype=np.float32)
+    if a.ndim == 2 and a.shape[0] <= 2 < a.shape[1]:
+        a = a.T
+    if a.ndim == 1:
+        a = a[:, None]
+    peak = float(np.abs(a).max()) if a.size else 0.0
+    if peak > 0.999:                       # ayristirma ciktisi 0 dBFS'i asabilir: kirpma yerine olcekle
+        a = a * (0.999 / peak)
+    out = path_noext + ext
+    tmp = path_noext + ".tmp" + ext
+    if ext == ".ogg":
+        import soundfile as sf
+        with sf.SoundFile(tmp, "w", sr, a.shape[1], format="OGG", subtype="VORBIS") as f:
+            try:
+                f.compression_level = 0.5
+            except Exception:
+                pass
+            f.write(a)
+    else:
+        d = (np.clip(a, -1, 1) * 32767).astype("<i2")
+        with wave.open(tmp, "wb") as w:
+            w.setnchannels(d.shape[1])
+            w.setsampwidth(2)
+            w.setframerate(sr)
+            w.writeframes(d.tobytes())
+    os.replace(tmp, out)
+    return out
+
+
+def _meta_kw(meta: AudioMeta) -> dict:
+    return dict(title=meta.title, artist=meta.artist or "Unknown Artist", album=meta.album, year=meta.year,
+                genre=meta.genre)
+
+
+def _with_stream(text: str, stream: str) -> str:
+    return re.sub(r'MusicStream = "[^"]*"', f'MusicStream = "{stream}"', text, count=1)
+
+
+def _run_guitar_pipeline(stereo, sr, meta, progress, cancel, stems=None):
+    from .ai import pipeline
+    from .ai.runtime import Cancelled
+    try:
+        return pipeline.chart_with_guitar(stereo, sr, progress=progress, cancel=cancel, stems=stems,
+                                          music_stream="song" + stem_ext(), **_meta_kw(meta))
+    except (ImportFailed, Cancelled):
+        raise
+    except MemoryError as exc:
+        raise ImportFailed("not enough memory for guitar detection", "imp.err_chart", err="memory") from exc
+    except Exception as exc:
+        raise ImportFailed(f"auto-charting failed: {exc}", "imp.err_chart", err=str(exc)) from exc
+
+
+def _use_ai(use_ai: bool, dur: float) -> bool:
+    if not use_ai:
+        return False
+    from .ai.pipeline import MAX_AI_SECONDS
+    return dur <= MAX_AI_SECONDS and ai_available()[0]
+
+
+def import_audio(path: str, songs_root: str, progress=None, *, use_ai: bool = True, cancel=None,
+                 info: dict | None = None) -> str:
+    """Ses dosyasini ice aktar; yeni sarki klasorunun yolunu dondur.
+
+    use_ai: gitar kalibrasyonu (Demucs ile gitar ayristirma + basic-pitch) - klasore guitar.ogg (ayristirilan
+    gitar, kacirinca kisilir) + song.ogg (geri kalan) yazilir. Gitar bulunamazsa miks charter'i + orijinal dosya.
+    info: (verildiyse) {'mode': 'guitar'|'mix', 'notice': i18n anahtari, 'timings': {...}} doldurulur.
+    """
     path = os.fspath(path)
+    info = info if info is not None else {}
     if not os.path.isfile(path):
         raise ImportFailed("file not found", "imp.err_not_found")
     ext = os.path.splitext(path)[1].lower()
     if ext not in AUDIO_EXTS:
         raise ImportFailed(f"unsupported file type '{ext or '?'}' (use MP3, OGG, WAV, FLAC or OPUS)", "imp.err_type",
                            ext=ext or "?")
-    _progress(progress, 0.01, "Reading tags")
+    _progress(progress, 0.005, "Reading tags")
     meta = resolve_meta(path)
-    _progress(progress, 0.04, "Decoding audio")
-    samples, sr = decode_audio(path)
+    _progress(progress, 0.01, "Decoding audio")
+    stereo, sr = decode_audio(path, stereo=True)
+    samples = stereo.mean(axis=1)
     dur = samples.size / float(sr or 1)
     if dur < MIN_SECONDS:
         raise ImportFailed(f"audio is too short ({dur:.1f} s, need at least {MIN_SECONDS:.0f} s)", "imp.err_short",
@@ -330,25 +426,41 @@ def import_audio(path: str, songs_root: str, progress=None) -> str:
                            dur=f"{dur / 60:.1f}", max=f"{MAX_SECONDS / 60:.0f}")
     if not np.isfinite(samples).all() or float(np.abs(samples).max()) < 1e-4:
         raise ImportFailed("audio is silent", "imp.err_silent")
-    stream = "song" + ext
-    try:
-        res = _chart_audio(samples, sr, meta, stream, progress)
-    except ImportFailed:
-        raise
-    except Exception as exc:
-        raise ImportFailed(f"auto-charting failed: {exc}", "imp.err_chart", err=str(exc)) from exc
-    _progress(progress, 0.92, "Writing song files")
+    out = None
+    if _use_ai(use_ai, dur):
+        out = _run_guitar_pipeline(stereo, sr, meta, lambda f, t: _progress(progress, 0.02 + 0.9 * f, t), cancel)
+        res = out.result
+        info.update(mode=out.mode, notice=out.notice, timings=dict(out.timings))
+    else:
+        info.update(mode="mix", notice="" if not use_ai else "imp.no_ai", timings={})
+        try:
+            res = _chart_audio(samples, sr, meta, "song" + ext, progress)
+        except ImportFailed:
+            raise
+        except Exception as exc:
+            raise ImportFailed(f"auto-charting failed: {exc}", "imp.err_chart", err=str(exc)) from exc
+    del samples
+    from .ai.runtime import check_cancel
+    check_cancel(cancel)
+    _progress(progress, 0.93, "Writing song files")
     os.makedirs(songs_root, exist_ok=True)
     name = sanitize_name(f"{meta.artist} - {meta.title}" if meta.artist else meta.title)
     folder = unique_folder(songs_root, name)
+    guitar_mode = out is not None and out.mode == "guitar"
     try:
         os.makedirs(folder)
-        shutil.copyfile(path, os.path.join(folder, stream))
+        if guitar_mode:
+            write_stem(os.path.join(folder, "guitar"), out.guitar, out.sr)
+            stream = os.path.basename(write_stem(os.path.join(folder, "song"), out.backing, out.sr))
+        else:
+            stream = "song" + ext
+            shutil.copyfile(path, os.path.join(folder, stream))
         with open(os.path.join(folder, "notes.chart"), "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(res.text)
+            fh.write(_with_stream(res.text, stream))
         write_song_ini(os.path.join(folder, "song.ini"), meta, length_ms=int(round(dur * 1000)),
-                       preview_ms=res.preview_ms, diff=res.difficulty, source=os.path.basename(path))
-        _progress(progress, 0.96, "Drawing album art")
+                       preview_ms=res.preview_ms, diff=res.difficulty, source=os.path.basename(path),
+                       mode="guitar" if guitar_mode else "mix")
+        _progress(progress, 0.97, "Drawing album art")
         write_cover(folder, meta)
     except Exception as exc:
         shutil.rmtree(folder, ignore_errors=True)
@@ -363,9 +475,31 @@ def find_song_audio(folder: str) -> str:
     return stems.get("song") or stems.get("guitar") or next(iter(stems.values()), "")
 
 
-def rechart_song(folder: str, progress=None) -> str:
-    """Klasordeki ses dosyasindan notes.chart'i yeniden uret (eski dosya .bak olarak saklanir)."""
+def _decode_pair(song: str, guitar: str) -> tuple[np.ndarray, np.ndarray, int]:
+    """song + guitar stem'lerini ayni uzunlukta (L, 2) stereo coz."""
+    s, sr = decode_audio(song, stereo=True)
+    g, sr2 = decode_audio(guitar, stereo=True)
+    if sr2 != sr:
+        from .ai.pipeline import resample_hq
+        g = resample_hq(g.T, sr2, sr).T
+    s = s if s.shape[1] == 2 else np.repeat(s[:, :1], 2, axis=1)
+    g = g if g.shape[1] == 2 else np.repeat(g[:, :1], 2, axis=1)
+    n = min(len(s), len(g))
+    return s[:n], g[:n], sr
+
+
+def rechart_song(folder: str, progress=None, *, use_ai: bool = True, cancel=None, info: dict | None = None) -> str:
+    """Klasordeki sesten notes.chart'i yeniden uret (eski dosya .bak olarak saklanir).
+
+    - Onceden gitar kalibrasyonu yapilmis klasor (guitar.* + song.*, auto_chart_mode = guitar): ayristirma atlanir,
+      mevcut stem'lerden yeniden transkripsiyon + chart (hizli).
+    - Eski (miks tabanli) otomatik klasor + use_ai: gitar ayristirilir; basariliysa guitar.ogg + song.ogg yazilir
+      ve eski tek miks dosyasi silinir (stem'lerin toplami = miks).
+    """
+    from .chart.loader import find_stems
     from .chart.song_ini import read_song_ini
+    info = info if info is not None else {}
+    stems = find_stems(folder)
     audio = find_song_audio(folder)
     if not audio:
         raise ImportFailed("no audio file in this song folder", "imp.err_no_audio")
@@ -373,24 +507,57 @@ def rechart_song(folder: str, progress=None) -> str:
     ini = read_song_ini(ini_path) if os.path.exists(ini_path) else {}
     meta = AudioMeta(title=ini.get("name", "") or os.path.basename(folder), artist=ini.get("artist", ""),
                      album=ini.get("album", ""), year=ini.get("year", ""), genre=ini.get("genre", ""))
-    _progress(progress, 0.04, "Decoding audio")
-    samples, sr = decode_audio(audio)
-    try:
-        res = _chart_audio(samples, sr, meta, os.path.basename(audio), progress)
-    except Exception as exc:
-        raise ImportFailed(f"auto-charting failed: {exc}", "imp.err_chart", err=str(exc)) from exc
+    _progress(progress, 0.01, "Decoding audio")
+    have_stems = "song" in stems and "guitar" in stems
+    if have_stems:
+        song_st, gtr_st, sr = _decode_pair(stems["song"], stems["guitar"])
+        stereo = song_st + gtr_st
+    else:
+        stereo, sr = decode_audio(audio, stereo=True)
+        song_st = gtr_st = None
+    samples = stereo.mean(axis=1)
+    dur = samples.size / float(sr or 1)
+    out = None
+    if _use_ai(use_ai, dur):
+        pre = (gtr_st.T, song_st.T) if have_stems else None
+        out = _run_guitar_pipeline(stereo, sr, meta, lambda f, t: _progress(progress, 0.02 + 0.9 * f, t), cancel,
+                                   stems=pre)
+        res = out.result
+        info.update(mode=out.mode, notice=out.notice, timings=dict(out.timings))
+    else:
+        info.update(mode="mix", notice="" if not use_ai else "imp.no_ai", timings={})
+        try:
+            res = _chart_audio(samples, sr, meta, os.path.basename(audio), progress)
+        except Exception as exc:
+            raise ImportFailed(f"auto-charting failed: {exc}", "imp.err_chart", err=str(exc)) from exc
+    from .ai.runtime import check_cancel
+    check_cancel(cancel)
     _progress(progress, 0.94, "Writing chart")
+    guitar_mode = out is not None and out.mode == "guitar"
+    stream = os.path.basename(stems.get("song") or audio)
     chart_path = os.path.join(folder, "notes.chart")
     tmp = chart_path + ".tmp"
     try:
+        if guitar_mode and not have_stems:
+            # eski tek miks -> ayristirilmis stem'ler (miks dosyasi en son, stem'ler yazildiktan sonra silinir)
+            write_stem(os.path.join(folder, "guitar"), out.guitar, out.sr)
+            new_song = write_stem(os.path.join(folder, "song"), out.backing, out.sr)
+            stream = os.path.basename(new_song)
+            if os.path.normcase(os.path.abspath(audio)) != os.path.normcase(os.path.abspath(new_song)):
+                try:
+                    os.remove(audio)
+                except OSError:
+                    pass
         with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(res.text)
+            fh.write(_with_stream(res.text, stream))
         if os.path.exists(chart_path):
             shutil.copyfile(chart_path, chart_path + ".bak")
         os.replace(tmp, chart_path)
         _update_ini(ini_path, {"diff_guitar": str(res.difficulty), "preview_start_time": str(res.preview_ms),
-                               "song_length": str(int(round(samples.size / sr * 1000))), "auto_chart": "1",
-                               "charter": "RIFF Auto", "auto_chart_version": str(AUTO_CHART_VERSION)})
+                               "song_length": str(int(round(dur * 1000))), "auto_chart": "1",
+                               "charter": "RIFF Auto", "auto_chart_version": str(AUTO_CHART_VERSION),
+                               "auto_chart_mode": "guitar" if guitar_mode else "mix",
+                               "loading_phrase": LOADING_PHRASES["guitar" if guitar_mode else "mix"]})
     except Exception as exc:
         try:
             os.remove(tmp)

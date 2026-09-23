@@ -443,14 +443,51 @@ def read_metadata(path: str) -> AudioMeta:
     return meta
 
 
+# indirme sitesi / video etiketi kalintilari: "(mp3.pm)", "[www.site.com]", "(Official Video)", "(Lyrics)",
+# "HQ", "320kbps" ... (parantez icindeki "Live", "Remix", "feat. X" gibi gercek bilgiler korunur)
+_DOMAIN = (r"(?:www\.[^\s\])}]+|[a-z0-9][a-z0-9-]*\.(?:com|net|org|pm|ru|io|me|info|biz|cc|to|tv|fm|co|xyz|club|"
+           r"site|online|top|mobi|us|uk|de|tr|in|eu|su|ws|la|name|mp3)\b)")
+_JUNK_WORD = (r"(?:official\s*(?:music\s*|lyrics?\s*|hd\s*)?(?:video|audio|clip|visuali[sz]er)|"
+              r"(?:official\s*)?lyrics?(?:\s*video)?|audio(?:\s*only)?|video\s*clip|visuali[sz]er|hq|hd|4k|"
+              r"\d{2,3}\s*kbps|mp3|free\s*download|download|full\s*hd|high\s*quality|clip\s*officiel)")
+_JUNK_TRAIL = r"(?:hq|hd|4k|\d{2,3}\s*kbps|mp3|official\s*(?:music\s*)?(?:video|audio)|lyrics?\s*video)"
+
+
+def _is_junk(content: str) -> bool:
+    c = content.strip().lower()
+    if not c:
+        return True
+    if re.search(_DOMAIN, c):
+        return True
+    return re.fullmatch(rf"{_JUNK_WORD}(?:[\s,/|+&-]+{_JUNK_WORD})*", c) is not None
+
+
+def clean_title(s: str) -> str:
+    """Etiket / dosya adindan gelen ad: alt cizgi -> bosluk, site ve video etiketi kalintilari, sondaki nokta /
+    alt cizgi / tire temizlenir. Tamamen bos kalirsa orijinal (sadece bosluklar duzeltilmis) doner."""
+    if not s:
+        return s
+    orig = _clean(s.replace("_", " "))
+    t = orig
+    t = re.sub(r"\s*[\(\[\{]([^\(\)\[\]\{\}]*)[\)\]\}]", lambda m: "" if _is_junk(m.group(1)) else m.group(0), t)
+    t = re.sub(rf"^\s*{_DOMAIN}\s*[-|~:]+\s*", "", t, flags=re.I)
+    prev = None
+    while prev != t:
+        prev = t
+        t = re.sub(rf"\s*[-|~]?\s*(?:{_JUNK_TRAIL}|{_DOMAIN})\s*$", "", t, flags=re.I)
+    t = _clean(t).strip(" ._-|~")
+    return t or orig.strip(" _")
+
+
 def meta_from_filename(path: str) -> tuple[str, str]:
     """(sanatci, baslik) dosya adindan. 'Artist - Title' / '01 - Artist - Title' / '01. Title'."""
     stem = os.path.splitext(os.path.basename(path))[0]
     stem = _clean(stem.replace("_", " "))
+    stem = clean_title(stem) or stem
     stripped = re.sub(r"^\s*\d{1,3}\s*[-._)]\s*", "", stem)
     if stripped:
         stem = stripped
     if " - " in stem:
         artist, title = stem.split(" - ", 1)
-        return artist.strip(), title.strip() or stem
+        return clean_title(artist.strip()), clean_title(title.strip()) or stem
     return "", stem
