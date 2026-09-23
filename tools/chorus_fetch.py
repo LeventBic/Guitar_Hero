@@ -5,7 +5,7 @@ gore yapildigi icin senkron birebirdir.
 Kullanim:
   .venv\\Scripts\\python.exe tools\\chorus_fetch.py "Metallica One"                 # ara, en iyi eslesmeyi indir
   .venv\\Scripts\\python.exe tools\\chorus_fetch.py "Metallica One" --list          # yalniz sonuclari listele
-  .venv\\Scripts\\python.exe tools\\chorus_fetch.py --md5 410e6812... --songs D:\\RIFF\\Songs
+  .venv\\Scripts\\python.exe tools\\chorus_fetch.py --md5 410e6812...,5077d61c... --no-video --songs D:\\RIFF\\Songs
   .venv\\Scripts\\python.exe tools\\chorus_fetch.py --from-file liste.txt           # satir basina "Sanatci Sarki"
 
 Yalniz Expert'i olan chart'lara Hard / Medium / Easy, Expert notalarindan secilerek eklenir (senkron ayni kalir);
@@ -25,6 +25,7 @@ import sys
 import tempfile
 import time
 import unicodedata
+import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +38,7 @@ from gh.chart.song_ini import strip_rich_text  # noqa: E402
 from gh.importer import fill_difficulties  # noqa: E402
 
 API = "https://api.enchor.us/search"
-FILES = "https://files.enchor.us/{md5}.sng"
+FILES = "https://files.enchor.us/{md5}{suffix}.sng"
 UA = "RIFF-rhythm-game/1.0 (chorus_fetch.py)"
 OFFICIAL = {"harmonix", "neversoft", "vicarious visions", "freestylegames", "activision", "budcat", "beenox"}
 PAUSE_S = 1.5
@@ -97,18 +98,25 @@ def _folder_name(meta_artist: str, meta_name: str) -> str:
     return s or "Chorus Song"
 
 
-def download(md5: str, songs_dir: str, name_hint: tuple[str, str] = ("", "")) -> str:
-    """md5 paketini indir, Songs altinda '<Sanatci> - <Sarki>' klasorune ac (varsa ' (2)' ...)."""
+def download(md5: str, songs_dir: str, name_hint: tuple[str, str] = ("", ""), no_video: bool = False) -> str:
+    """md5 paketini indir, Songs altinda '<Sanatci> - <Sarki>' klasorune ac (varsa ' (2)' ...).
+    no_video: klipsiz paket (<md5>_novideo.sng; sunucuda yoksa normal paket)."""
     if not re.fullmatch(r"[0-9a-f]{32}", md5):
         raise ValueError(f"bad md5: {md5}")
     os.makedirs(songs_dir, exist_ok=True)
     fd, tmp = tempfile.mkstemp(suffix=".sng")
     os.close(fd)
     try:
-        req = urllib.request.Request(FILES.format(md5=md5), headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as f:
-            while chunk := r.read(1 << 20):
-                f.write(chunk)
+        for suffix in (("_novideo", "") if no_video else ("",)):
+            req = urllib.request.Request(FILES.format(md5=md5, suffix=suffix), headers={"User-Agent": UA})
+            try:
+                with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "wb") as f:
+                    while chunk := r.read(1 << 20):
+                        f.write(chunk)
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code != 404 or not suffix:
+                    raise
         from gh.chart.sng import read_sng
         meta, _files = read_sng(tmp)
         base = _folder_name(meta.get("artist", name_hint[0]), meta.get("name", name_hint[1]))
@@ -131,7 +139,8 @@ def download(md5: str, songs_dir: str, name_hint: tuple[str, str] = ("", "")) ->
             pass
 
 
-def fetch(query: str, songs_dir: str, *, allow_official: bool = False, dry: bool = False) -> str | None:
+def fetch(query: str, songs_dir: str, *, allow_official: bool = False, dry: bool = False,
+          no_video: bool = False) -> str | None:
     res = search(query)
     r = pick(res, query, allow_official)
     if r is None:
@@ -140,7 +149,7 @@ def fetch(query: str, songs_dir: str, *, allow_official: bool = False, dry: bool
     print(f"FOUND      {query}  ->  {describe(r)}")
     if dry:
         return None
-    dest = download(r["md5"], songs_dir, (r.get("artist", ""), r.get("name", "")))
+    dest = download(r["md5"], songs_dir, (r.get("artist", ""), r.get("name", "")), no_video=no_video)
     print(f"SAVED      {dest}")
     return dest
 
@@ -155,13 +164,16 @@ def main(argv=None) -> int:
     p.add_argument("--dry-run", action="store_true", help="show picks without downloading")
     p.add_argument("--allow-official", action="store_true", help="also pick charts ripped from official games")
     p.add_argument("--fill", metavar="FOLDER", help="add missing Hard/Medium/Easy to an existing song folder")
+    p.add_argument("--no-video", action="store_true", help="download the package without the music video")
     a = p.parse_args(argv)
     if a.fill:
         made = fill_difficulties(a.fill)
         print(f"FILLED     {', '.join(made)}" if made else "nothing to fill (no Expert-only notes.chart)")
         return 0
     if a.md5:
-        print("SAVED", download(a.md5.lower(), a.songs))
+        for m in a.md5.lower().split(","):
+            print("SAVED", download(m.strip(), a.songs, no_video=a.no_video))
+            time.sleep(PAUSE_S)
         return 0
     if a.from_file:
         with open(a.from_file, encoding="utf-8") as f:
@@ -169,7 +181,8 @@ def main(argv=None) -> int:
         missing = 0
         for q in queries:
             try:
-                missing += fetch(q, a.songs, allow_official=a.allow_official, dry=a.dry_run) is None and not a.dry_run
+                missing += fetch(q, a.songs, allow_official=a.allow_official, dry=a.dry_run,
+                                 no_video=a.no_video) is None and not a.dry_run
             except Exception as exc:  # ag hatasi: listeye devam
                 missing += 1
                 print(f"ERROR      {q}: {exc}")
@@ -182,7 +195,8 @@ def main(argv=None) -> int:
         for r in search(a.query):
             print(describe(r))
         return 0
-    return 0 if fetch(a.query, a.songs, allow_official=a.allow_official, dry=a.dry_run) or a.dry_run else 1
+    return 0 if fetch(a.query, a.songs, allow_official=a.allow_official, dry=a.dry_run,
+                      no_video=a.no_video) or a.dry_run else 1
 
 
 if __name__ == "__main__":
