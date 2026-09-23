@@ -394,7 +394,7 @@ def language_name(code: str | None = None) -> str:
     return dict(LANGUAGES).get(code or _lang, code or _lang)
 
 
-def t(key: str, **fmt) -> str:
+def t(key: str, /, **fmt) -> str:
     entry = STRINGS.get(key)
     if entry is None:
         s = key
