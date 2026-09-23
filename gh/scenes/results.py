@@ -7,6 +7,7 @@ import statistics
 
 import pygame
 
+from ..i18n import diff_name, t, upper
 from ..render.assets import GOLD, NEON_CYAN, NEON_PINK, TEXT, TEXT_DIM, W, lighten
 from ..render.ui import MenuList, SynthBackground, draw_hints, draw_panel, draw_star
 from .base import Scene
@@ -20,7 +21,7 @@ class ResultsScene(Scene):
         super().__init__(app)
         self.s = stats
         self.bg = SynthBackground()
-        self.menu = MenuList(["CONTINUE", "RETRY"], 1040, 600, spacing=54, size=30)
+        self.menu = MenuList(["res.continue", "res.retry"], 1040, 600, spacing=54, size=30)
         self.stars_full = 0 if stats["failed"] else int(math.floor(stats["stars"] + 1e-9))
         self.star_frac = 0.0 if stats["failed"] else stats["stars"] - self.stars_full
         self.shown = 0
@@ -87,11 +88,12 @@ class ResultsScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 12, 140))
         surf.blit(shade, (0, 0))
-        head = "SONG FAILED" if s["failed"] else ("FULL COMBO!" if s["fc"] else "SONG COMPLETE")
+        head = t("res.failed") if s["failed"] else (t("res.fc") if s["fc"] else t("res.complete"))
         col = (255, 90, 100) if s["failed"] else (GOLD if s["fc"] else (255, 120, 210))
         img = tc.glow(head, 58, col, glow_color=col)
         surf.blit(img, (W // 2 - img.get_width() // 2, 18))
-        sub = tc.render(f"{s['title']}  -  {s['artist']}   [{s['difficulty'].upper()}{'  BOT' if s['autoplay'] else ''}]",
+        bot = "  " + t("common.bot") if s["autoplay"] else ""
+        sub = tc.render(f"{s['title']}  -  {s['artist']}   [{upper(diff_name(s['difficulty']))}{bot}]",
                         22, TEXT_DIM)
         surf.blit(sub, (W // 2 - sub.get_width() // 2, 100))
 
@@ -120,16 +122,16 @@ class ResultsScene(Scene):
                     w = int(60 * self.star_frac)
                     pygame.draw.rect(surf, (120, 100, 40), (cx - 30, cy + 38, w, 4))
         if gold:
-            g = tc.glow("GOLD STARS!", 30, (255, 220, 60), glow_color=(255, 180, 0))
+            g = tc.glow(t("res.gold"), 30, (255, 220, 60), glow_color=(255, 180, 0))
             surf.blit(g, (340 - g.get_width() // 2, 322))
         total = max(1, s["total"])
         pct = 100.0 * s["notes_hit"] / total
         rows = [
-            ("Notes hit", f"{s['notes_hit']} / {s['total']}   ({pct:.1f}%)"),
-            ("Max combo", f"{s['max_combo']}"),
-            ("Overstrums", f"{s['overstrums']}"),
-            ("Star Power phrases", f"{s['sp_done']} / {s['sp_total']}"),
-            ("Stars", f"{s['stars']:.2f}" if not s["failed"] else "-"),
+            (t("res.notes_hit"), f"{s['notes_hit']} / {s['total']}   ({pct:.1f}%)"),
+            (t("res.max_combo"), f"{s['max_combo']}"),
+            (t("res.overstrums"), f"{s['overstrums']}"),
+            (t("res.sp_phrases"), f"{s['sp_done']} / {s['sp_total']}"),
+            (t("res.stars"), f"{s['stars']:.2f}" if not s["failed"] else "-"),
         ]
         y = 402
         for lab, val in rows:
@@ -142,9 +144,10 @@ class ResultsScene(Scene):
 
         # sag panel: histogram
         draw_panel(surf, (660, 140, 560, 380), border=NEON_CYAN)
-        t = tc.render("TIMING", 22, NEON_CYAN, "ui", True)
-        surf.blit(t, (690, 156))
-        md = tc.render(f"median {self.median * 1000:+.1f} ms   mean {self.mean * 1000:+.1f} ms", 18, TEXT_DIM)
+        ti = tc.render(t("res.timing"), 22, NEON_CYAN, "ui", True)
+        surf.blit(ti, (690, 156))
+        md = tc.render(t("res.median_mean", med=f"{self.median * 1000:+.1f}", mean=f"{self.mean * 1000:+.1f}"), 18,
+                       TEXT_DIM)
         surf.blit(md, (1190 - md.get_width(), 160))
         hx, hy, hw, hh = 700, 200, 480, 240
         mx = max(1, max(self.hist))
@@ -169,9 +172,9 @@ class ResultsScene(Scene):
             x = hx + hw * (ms / 1000 + HIST_RANGE) / (2 * HIST_RANGE)
             lab = tc.render(f"{ms:+d}" if ms else "0", 14, TEXT_DIM)
             surf.blit(lab, (x - lab.get_width() // 2, hy + hh + 10))
-        e = tc.render("EARLY", 14, TEXT_DIM, "ui", True)
-        l = tc.render("LATE", 14, TEXT_DIM, "ui", True)
+        e = tc.render(t("hud.early"), 14, TEXT_DIM, "ui", True)
+        l = tc.render(t("hud.late"), 14, TEXT_DIM, "ui", True)
         surf.blit(e, (hx, hy + hh + 30))
         surf.blit(l, (hx + hw - l.get_width(), hy + hh + 30))
         self.menu.draw(surf, a, 300)
-        draw_hints(surf, a, [("Up/Down", "Select"), ("Enter", "Confirm"), ("Esc", "Song list")])
+        draw_hints(surf, a, [("key.updown", "hint.select"), ("Enter", "hint.confirm"), ("Esc", "hint.song_list")])

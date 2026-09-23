@@ -108,6 +108,7 @@ class SongInfo:
     diff_guitar: int = -1
     eighthnote_hopo: bool = False         # song.ini eighthnote_hopo: .mid HOPO esigi res/2+1
     multiplier_note: int = 116            # song.ini multiplier_note: .mid SP nota numarasi (103/116)
+    auto_chart: bool = False              # song.ini auto_chart = 1: RIFF otomatik chart'i (ice aktarilan sarki)
     folder: str = ""
     chart_path: str = ""
     album_art: str = ""

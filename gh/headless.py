@@ -81,6 +81,18 @@ def smoke_all(app, song: str | None = None, diff: str | None = None, fps: float 
     return out
 
 
+def import_files(app, paths: list[str], timeout: float = 600.0) -> list[dict]:
+    """Ice aktarma sahnesini (arka plan is parcacigi dahil) headless calistir. [{name, ok, folder, message}]"""
+    from .scenes.importer import ImportScene
+    scene = ImportScene(app, paths)
+    app.stack = [scene]
+    scene.enter()
+    scene.wait(timeout)
+    out = [{"name": j.name, "ok": j.status == "ok", "folder": j.result, "message": j.message} for j in scene.jobs]
+    app.stack = []
+    return out
+
+
 def _save(surf: pygame.Surface, path: str, scale: float = 1.0) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
     if scale != 1.0:
@@ -145,6 +157,33 @@ def screenshot_menus(app, path: str, scale: float = 1.0) -> list[str]:
     app.stack = [title]
     _run_scene(app, CalibrationScene(app), 0.4)
     save("calibration")
+    # sarki ekleme: birakma alani, ilerleme paneli, sonuc (sahte is durumlariyla, is parcacigi yok)
+    from .scenes.importer import ImportScene, Job
+    app.stack = [title]
+    imp = ImportScene(app)
+    _run_scene(app, imp, 0.5)
+    save("import")
+    demo = [("audio", "Artist - First Song.mp3", "ok", "", 1.0), ("audio", "Artist - Second Song.flac", "running",
+            "Finding notes", 0.62), ("audio", "Third Song.ogg", "queued", "", 0.0),
+            ("audio", "broken file.wav", "error", "cannot decode audio (unsupported format)", 0.0)]
+    imp.jobs = []
+    for kind, name, status, stage, prog in demo:
+        j = Job(kind, name)
+        j.status, j.stage, j.progress = status, stage, prog
+        if status == "ok":
+            j.result = os.path.join("Songs", "Artist - First Song")
+        if status == "error":
+            j.message, j.msg_key, j.msg_params = stage, "imp.err_decode", {"err": "unsupported format"}
+        imp.jobs.append(j)
+    imp.mode = "work"
+    app.draw(app.screen)
+    save("import_progress")
+    for j in imp.jobs:
+        if j.status in ("running", "queued"):
+            j.status, j.result = "ok", os.path.join("Songs", j.name)
+    imp.mode, imp.sel = "done", 0
+    app.draw(app.screen)
+    save("import_done")
     if sl.songs:
         info = sl.songs[0]
         from .library import available_difficulties

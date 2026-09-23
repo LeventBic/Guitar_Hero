@@ -9,6 +9,7 @@ import pygame
 from ..audio import Conductor
 from ..engine import EvType, GuitarEngine, InputEvent, InputKind, autoplay_inputs
 from ..engine.rules import sustain_ends
+from ..i18n import diff_name, section_label, t, upper
 from ..render.assets import GOLD, NEON_ORANGE, NEON_PINK, TEXT, TEXT_DIM, W
 from ..render.highway import HighwayRenderer
 from ..render.hud import HUD
@@ -21,6 +22,8 @@ END_PAD = 2.2
 
 
 class GameplayScene(Scene):
+    blocks_import = True
+
     def __init__(self, app, info, difficulty: str, *, autoplay: bool = False, sim: bool = False):
         super().__init__(app)
         self.info = info
@@ -61,7 +64,7 @@ class GameplayScene(Scene):
         self.section_marks = [x.time / self.song_length for x in self.sections if self.song_length > 0]
         self.title = cinfo.name or info.name
         self.artist = cinfo.artist or info.artist
-        self.diff_label = difficulty.upper() + ("  -  BOT" if autoplay else "")
+        self.diff_label = upper(diff_name(difficulty)) + ("  -  " + t("common.bot") if autoplay else "")
         self.window = self.cfg.window_back
         self.lead_in = LEAD_IN
         self.bot_events = autoplay_inputs(self.track, self.cfg) if autoplay else []
@@ -149,8 +152,8 @@ class GameplayScene(Scene):
         c = self.conductor
         if self.sim:
             c.advance(dt)
-        t = c.update()
-        self.song_time = t
+        now = c.update()
+        self.song_time = now
         self.visual_time = c.visual_time()
         self.show_debug = self.app.settings.video.show_debug
         self.fps = self.app.fps
@@ -167,11 +170,11 @@ class GameplayScene(Scene):
         if self.state in ("play", "ending"):
             if self.autoplay:
                 ev = self.bot_events
-                lim = t + 0.03
+                lim = now + 0.03
                 while self.bot_i < len(ev) and ev[self.bot_i].time <= lim:
                     self.engine.push(ev[self.bot_i])
                     self.bot_i += 1
-            self.engine.update(t)
+            self.engine.update(now)
             self._handle_events(self.engine.pop_events())
         # beat
         tm = self.chart.tempo_map
@@ -182,14 +185,14 @@ class GameplayScene(Scene):
         while self.section_i < len(self.sections) and self.sections[self.section_i].time <= self.visual_time:
             sec = self.sections[self.section_i]
             if self.visual_time - sec.time < 1.0:
-                self.hud.banner(sec.name.upper(), dur=2.0, y=150)
+                self.hud.banner(upper(section_label(sec.name)), dur=2.0, y=150)
             self.section_i += 1
         # SP hazir
         eng = self.engine
         ready = eng.sp_meter >= self.cfg.sp_activation_min - 1e-9 and not eng.sp_active
         if ready and not self.sp_ready_prev:
             self.sfx("sp_ready", 0.9)
-            self.hud.popup("STAR POWER READY", 30, (140, 220, 255), dur=1.2, y=420)
+            self.hud.popup(t("game.sp_ready"), 30, (140, 220, 255), dur=1.2, y=420)
         self.sp_ready_prev = ready
         # skor animasyonu
         diff = eng.score - self.display_score
@@ -200,11 +203,11 @@ class GameplayScene(Scene):
         self.highway.update(dt)
         self.hud.update(dt)
         # bitis
-        if self.state == "play" and t >= self.end_trigger:
+        if self.state == "play" and now >= self.end_trigger:
             self.state = "ending"
             self.end_clock = 0.0
             if eng.notes_missed == 0 and eng.overstrums == 0:
-                self.hud.popup("FULL COMBO!", 64, GOLD, dur=2.0, y=300)
+                self.hud.popup(t("game.full_combo"), 64, GOLD, dur=2.0, y=300)
             self.sfx("crowd_cheer", 0.8)
             self.conductor.fadeout(1800)
         if self.state == "ending":
@@ -224,7 +227,7 @@ class GameplayScene(Scene):
                 hud.on_hit_offset(ev.offset)
                 self.conductor.set_guitar_muted(False)
                 if eng.combo >= 50 and eng.combo % 50 == 0:
-                    hud.popup(f"{eng.combo} NOTE STREAK!", 46, NEON_ORANGE, dur=1.5, y=300)
+                    hud.popup(t("game.streak", n=eng.combo), 46, NEON_ORANGE, dur=1.5, y=300)
                 if self.cur_solo is not None:
                     a, b = self.solos[self.cur_solo]
                     if a <= ev.note <= b:
@@ -243,7 +246,7 @@ class GameplayScene(Scene):
             elif ty == EvType.SP_ACTIVATED:
                 self.sfx("sp_activate", 1.0)
                 self.highway.on_sp_activate(self.visual_time)
-                hud.popup("STAR POWER!", 58, (120, 220, 255), dur=1.3, y=300)
+                hud.popup(t("game.sp"), 58, (120, 220, 255), dur=1.3, y=300)
             elif ty == EvType.SP_ENDED:
                 self.sfx("sp_deactivate", 0.8)
             elif ty == EvType.MULTIPLIER_CHANGED:
@@ -260,20 +263,20 @@ class GameplayScene(Scene):
                 if idx is not None:
                     a, b = self.solos[idx]
                     hud.solo = {"hits": 0, "total": max(0, b - a + 1)}
-                hud.popup("GUITAR SOLO!", 50, NEON_ORANGE, dur=1.6, y=250)
+                hud.popup(t("game.solo"), 50, NEON_ORANGE, dur=1.6, y=250)
             elif ty == EvType.SOLO_END:
                 pct = ev.value
                 if pct >= 99.999:
-                    txt, col = "PERFECT SOLO!", GOLD
+                    key, col = "game.solo_perfect", GOLD
                 elif pct >= 90:
-                    txt, col = "AWESOME SOLO!", (120, 230, 255)
+                    key, col = "game.solo_awesome", (120, 230, 255)
                 elif pct >= 75:
-                    txt, col = "GREAT SOLO!", (120, 240, 140)
+                    key, col = "game.solo_great", (120, 240, 140)
                 elif pct >= 50:
-                    txt, col = "GOOD SOLO", TEXT
+                    key, col = "game.solo_good", TEXT
                 else:
-                    txt, col = "MESSY SOLO", (240, 120, 120)
-                hud.popup(f"{txt}  {int(pct)}%", 48, col, dur=2.2, y=250)
+                    key, col = "game.solo_messy", (240, 120, 120)
+                hud.popup(f"{t(key)}  {int(pct)}%", 48, col, dur=2.2, y=250)
                 hud.solo = None
                 self.cur_solo = None
             elif ty == EvType.FAILED:
@@ -325,11 +328,12 @@ class GameplayScene(Scene):
 
 class PauseScene(Scene):
     opaque = False
+    blocks_import = True
 
     def __init__(self, app, game: GameplayScene):
         super().__init__(app)
         self.game = game
-        self.menu = MenuList(["RESUME", "RESTART", "SETTINGS", "QUIT TO SONG LIST"], W // 2, 318, spacing=54,
+        self.menu = MenuList(["pause.resume", "pause.restart", "pause.settings", "pause.quit"], W // 2, 318, spacing=54,
                              size=32)
 
     def on_game(self, gi) -> None:
@@ -375,21 +379,22 @@ class PauseScene(Scene):
     def draw(self, surf: pygame.Surface) -> None:
         fade_overlay(surf, 170, (6, 4, 16))
         draw_panel(surf, (W // 2 - 280, 150, 560, 400), border=NEON_PINK, fill=(10, 6, 24, 200))
-        img = self.assets.text.glow("PAUSED", 72, (255, 120, 210), glow_color=NEON_PINK)
+        img = self.assets.text.glow(t("pause.title"), 72, (255, 120, 210), glow_color=NEON_PINK)
         surf.blit(img, (W // 2 - img.get_width() // 2, 170))
         sub = self.assets.text.render(f"{self.game.title}  -  {self.game.artist}", 22, TEXT_DIM)
         surf.blit(sub, (W // 2 - sub.get_width() // 2, 262))
         self.menu.draw(surf, self.assets, 460)
-        draw_hints(surf, self.assets, [("Up/Down", "Select"), ("Enter", "Confirm"), ("Esc", "Resume")])
+        draw_hints(surf, self.assets, [("key.updown", "hint.select"), ("Enter", "hint.confirm"), ("Esc", "hint.resume")])
 
 
 class FailScene(Scene):
     opaque = False
+    blocks_import = True
 
     def __init__(self, app, game: GameplayScene):
         super().__init__(app)
         self.game = game
-        self.menu = MenuList(["RETRY", "RESULTS", "QUIT TO SONG LIST"], W // 2, 400, spacing=60, size=32)
+        self.menu = MenuList(["fail.retry", "fail.results", "pause.quit"], W // 2, 400, spacing=60, size=32)
 
     def on_menu(self, action: str) -> None:
         if self.t < 0.8:
@@ -419,12 +424,12 @@ class FailScene(Scene):
     def draw(self, surf: pygame.Surface) -> None:
         k = min(1.0, self.t / 0.8)
         fade_overlay(surf, int(190 * k), (30, 0, 8))
-        img = self.assets.text.glow("SONG FAILED", 84, (255, 80, 90), glow_color=(255, 20, 40))
+        img = self.assets.text.glow(t("fail.title"), 84, (255, 80, 90), glow_color=(255, 20, 40))
         y = 200 - int((1 - k) * 60)
         surf.blit(img, (W // 2 - img.get_width() // 2, y))
         g = self.game
         prog = g.song_time / max(1e-6, g.last_note_end)
-        sub = self.assets.text.render(f"{int(max(0, min(1, prog)) * 100)}% of the song completed", 24, TEXT_DIM)
+        sub = self.assets.text.render(t("fail.progress", p=int(max(0, min(1, prog)) * 100)), 24, TEXT_DIM)
         surf.blit(sub, (W // 2 - sub.get_width() // 2, 310))
         if self.t >= 0.8:
             self.menu.draw(surf, self.assets, 460)

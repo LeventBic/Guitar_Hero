@@ -6,6 +6,7 @@ import random
 
 import pygame
 
+from ..i18n import t
 from .assets import (BG_BOTTOM, BG_TOP, GOLD, NEON_CYAN, NEON_PINK, NEON_PURPLE, TEXT_DIM, W,
                      blur_surface, lerp_color, lighten, radial_glow, scale_color, star_points, vertical_gradient)
 
@@ -193,7 +194,8 @@ class MenuList:
         pygame.draw.rect(s, (255, 60, 170, 60 + int(30 * k)), (0, 0, *bar.size), border_radius=12)
         pygame.draw.rect(s, (255, 90, 190, 220), (0, 0, *bar.size), 2, border_radius=12)
         surf.blit(s, bar.topleft)
-        for i, it in enumerate(self.items):
+        for i, key in enumerate(self.items):
+            it = t(key)            # ogeler i18n anahtari (ya da duz metin); cizimde cevrilir
             sel = i == self.index
             if sel:
                 img = tc.glow(it, self.size, (255, 230, 250), "title", True, glow_color=NEON_PINK, radius=8)
@@ -225,8 +227,8 @@ def draw_hints(surf, assets, hints: list[tuple[str, str]], y: int = 690) -> None
     parts = []
     total = 0
     for key, desc in hints:
-        k = tc.render(key, 16, (20, 16, 30), "ui", True)
-        d = tc.render(desc, 16, TEXT_DIM, "ui")
+        k = tc.render(t(key), 16, (20, 16, 30), "ui", True)
+        d = tc.render(t(desc), 16, TEXT_DIM, "ui")
         parts.append((k, d))
         total += k.get_width() + 14 + 8 + d.get_width() + 28
     strip = pygame.Surface((W, 36), pygame.SRCALPHA)

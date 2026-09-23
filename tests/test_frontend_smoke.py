@@ -125,6 +125,12 @@ def test_menu_navigation_keyboard_only(app):
     _press(app, pygame.K_ESCAPE)
     assert isinstance(app.top, TitleScene)
     _press(app, pygame.K_DOWN)
+    _press(app, pygame.K_RETURN)          # IMPORT SONG
+    from gh.scenes import ImportScene
+    assert isinstance(app.top, ImportScene) and app.top.mode == "drop"
+    _press(app, pygame.K_ESCAPE)
+    assert isinstance(app.top, TitleScene)
+    _press(app, pygame.K_DOWN)
     _press(app, pygame.K_DOWN)
     _press(app, pygame.K_RETURN)
     assert isinstance(app.top, SettingsScene)

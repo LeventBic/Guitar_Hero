@@ -7,6 +7,7 @@ import os
 import pygame
 
 from ..config import DIFFICULTIES
+from ..i18n import diff_name, t, upper
 from ..library import available_difficulties, fmt_time, song_roots
 from ..render.assets import NEON_CYAN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, TEXT, TEXT_DIM, W
 from ..render.ui import SynthBackground, draw_hints, draw_panel, fade_overlay
@@ -19,28 +20,80 @@ DIFF_COLORS = {"easy": (80, 220, 110), "medium": (245, 205, 40), "hard": (250, 1
 
 
 class SongListScene(Scene):
-    def __init__(self, app):
+    def __init__(self, app, select_folder: str | None = None):
         super().__init__(app)
         self.bg = SynthBackground()
         self.songs = app.library.scan()
         self.index = 0
-        last = app.settings.extra.get("last_song", "")
-        for i, s in enumerate(self.songs):
-            if s.folder == last:
-                self.index = i
-        self.scroll = float(max(0, self.index - VISIBLE // 2))
-        self.dwell = 0.0
-        self.preview_started = False
         self.chart = None
         self.diffs: list[str] = []
         self._loaded_for = None
+        self._select(select_folder or app.settings.extra.get("last_song", ""))
+        self.scroll = float(max(0, self.index - VISIBLE // 2))
+        self.dwell = 0.0
+        self.preview_started = False
+
+    def _select(self, folder: str | None) -> None:
+        if not folder:
+            return
+        key = os.path.normcase(os.path.realpath(folder))
+        for i, s in enumerate(self.songs):
+            if os.path.normcase(os.path.realpath(s.folder)) == key:
+                self.index = i
+                return
+
+    def refresh(self, select_folder: str | None = None) -> None:
+        """Kutuphaneyi yeniden tara (ice aktarma / yeniden chart'lama sonrasi) ve istenen sarkiyi sec."""
+        cur = self.sel.folder if self.sel else None
+        if select_folder:
+            self.app.library.invalidate(select_folder)
+        self.songs = self.app.library.scan()
+        self.index = min(self.index, max(0, len(self.songs) - 1))
+        self._select(cur)
+        self._select(select_folder)
+        self._loaded_for = None
+        self.chart = None
+        self.diffs = []
+        self._load_selected()
+        self.scroll = float(min(max(0, self.index - VISIBLE // 2), max(0, len(self.songs) - VISIBLE)))
+
+    def open_difficulty(self) -> None:
+        self._load_selected()
+        if self.sel is None or not self.diffs:
+            return
+        self.app.settings.extra["last_song"] = self.sel.folder
+        self.app.push(DifficultyScene(self.app, self))
 
     def enter(self) -> None:
         self._load_selected()
+        if self.app.check_inbox():          # Songs/_Import'ta yeni dosya varsa once onlari ekle
+            self.preview_started = True
 
     def resume(self) -> None:
         self.dwell = 0.0
         self.preview_started = False
+
+    def on_shortcut(self, key: int) -> None:
+        if key == pygame.K_i:
+            from .importer import ImportScene
+            self.sfx("menu_select")
+            self.app.audio.stop_preview(150)
+            self.app.push(ImportScene(self.app))
+        elif key == pygame.K_r and self.sel is not None:
+            s = self.sel
+            if not s.auto_chart:
+                self.sfx("miss_buzz", 0.5)
+                return
+            from .importer import ConfirmScene, ImportScene
+            self.sfx("menu_select")
+            folder = s.folder
+
+            def go():
+                self.app.audio.stop_preview(150)
+                self.app.push(ImportScene(self.app, rechart=folder))
+
+            self.app.push(ConfirmScene(self.app, "songs.rechart_title",
+                                       [s.name, "songs.rechart_line1", "songs.rechart_line2"], go))
 
     def exit(self) -> None:
         self.app.audio.stop_preview(300)
@@ -106,6 +159,15 @@ class SongListScene(Scene):
             start = s.preview_start_ms / 1000.0 if s.preview_start_ms > 0 else 20.0
             self.app.audio.play_preview(path, start)
 
+    def _auto_badge(self, surf, right: int, y: int) -> int:
+        """Sag kenari `right` olan kucuk 'AUTO' rozeti; rozetin sol kenarini dondurur."""
+        img = self.assets.text.render(t("songs.auto"), 13, (20, 14, 30), "ui", True)
+        r = pygame.Rect(0, y, img.get_width() + 14, 22)
+        r.right = right
+        pygame.draw.rect(surf, NEON_CYAN, r, border_radius=6)
+        surf.blit(img, (r.x + 7, r.centery - img.get_height() // 2))
+        return r.x - 10
+
     def draw(self, surf: pygame.Surface) -> None:
         a = self.assets
         tc = a.text
@@ -113,21 +175,23 @@ class SongListScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 14, 150))
         surf.blit(shade, (0, 0))
-        head = tc.glow("SELECT SONG", 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
+        head = tc.glow(t("songs.title"), 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (40, 14))
-        cnt = tc.render(f"{len(self.songs)} songs", 18, TEXT_DIM)
+        cnt = tc.render(t("songs.count", n=len(self.songs)), 18, TEXT_DIM)
         surf.blit(cnt, (620 - cnt.get_width(), 38))
         if not self.songs:
             draw_panel(surf, (140, 200, 1000, 260))
-            m1 = tc.render("No songs found.", 34, TEXT, "ui", True)
+            m1 = tc.render(t("songs.none"), 34, TEXT, "ui", True)
             surf.blit(m1, (W // 2 - m1.get_width() // 2, 250))
             roots = song_roots()
-            m2 = tc.render("Put Clone Hero song folders (notes.chart / notes.mid + song.ogg) into:", 20, TEXT_DIM)
+            m2 = tc.render(t("songs.none_hint"), 20, TEXT_DIM)
             surf.blit(m2, (W // 2 - m2.get_width() // 2, 320))
             for i, r in enumerate(roots[:2]):
                 m3 = tc.render(os.path.abspath(r), 18, NEON_CYAN)
                 surf.blit(m3, (W // 2 - m3.get_width() // 2, 356 + i * 26))
-            draw_hints(surf, a, [("Esc", "Back")])
+            m4 = tc.render(t("songs.none_drop"), 20, NEON_ORANGE)
+            surf.blit(m4, (W // 2 - m4.get_width() // 2, 420))
+            draw_hints(surf, a, [("I", "hint.import_songs"), ("Esc", "hint.back")])
             return
         # liste
         list_rect = pygame.Rect(30, 80, 600, ROW_H * VISIBLE + 16)
@@ -148,11 +212,18 @@ class SongListScene(Scene):
                 surf.blit(hl, row.topleft)
             n = tc.render(s.name, 24, (255, 255, 255) if sel else TEXT, "ui", True)
             ar = tc.render(s.artist, 16, NEON_CYAN if sel else TEXT_DIM)
-            surf.blit(n, (row.x + 14, row.y + 3))
-            surf.blit(ar, (row.x + 14, row.y + 31))
+            right = row.right - 14
             if s.song_length_ms:
                 ln = tc.render(fmt_time(s.song_length_ms / 1000), 18, TEXT_DIM)
-                surf.blit(ln, (row.right - ln.get_width() - 14, row.y + 16))
+                surf.blit(ln, (right - ln.get_width(), row.y + 16))
+                right -= ln.get_width() + 12
+            if s.auto_chart:
+                right = self._auto_badge(surf, right, row.y + 15)
+            maxw = right - (row.x + 14) - 8
+            if n.get_width() > maxw > 40:
+                n = n.subsurface((0, 0, maxw, n.get_height()))
+            surf.blit(n, (row.x + 14, row.y + 3))
+            surf.blit(ar, (row.x + 14, row.y + 31))
         surf.set_clip(clip)
         # detay paneli
         s = self.sel
@@ -179,36 +250,38 @@ class SongListScene(Scene):
         y += 8
         meta = []
         if s.album:
-            meta.append(("Album", s.album))
+            meta.append(("songs.album", s.album))
         if s.year:
-            meta.append(("Year", s.year))
+            meta.append(("songs.year", s.year))
         if s.genre:
-            meta.append(("Genre", s.genre))
-        meta.append(("Charter", s.charter or "Unknown"))
+            meta.append(("songs.genre", s.genre))
+        auto = "  " + t("songs.auto_suffix") if s.auto_chart and "auto" not in (s.charter or "").lower() else ""
+        meta.append(("songs.charter", (s.charter or t("common.unknown")) + auto))
         if s.song_length_ms:
-            meta.append(("Length", fmt_time(s.song_length_ms / 1000)))
+            meta.append(("songs.length", fmt_time(s.song_length_ms / 1000)))
+        lab_w = max(80, max(tc.render(upper(t(k)), 14, TEXT_DIM, "ui", True).get_width() for k, _v in meta) + 12)
         for lab, val in meta:
-            l = tc.render(lab.upper(), 14, TEXT_DIM, "ui", True)
+            l = tc.render(upper(t(lab)), 14, TEXT_DIM, "ui", True)
             v = tc.render(str(val), 18, TEXT)
             surf.blit(l, (tx, y + 3))
-            surf.blit(v, (tx + 80, y))
+            surf.blit(v, (tx + lab_w, y))
             y += 28
         if s.diff_guitar >= 0:
-            l = tc.render("INTENSITY", 14, TEXT_DIM, "ui", True)
+            l = tc.render(t("songs.intensity"), 14, TEXT_DIM, "ui", True)
             surf.blit(l, (tx, y + 3))
             for k in range(6):
                 c = NEON_ORANGE if k < s.diff_guitar else (50, 46, 70)
-                pygame.draw.circle(surf, c, (tx + 90 + k * 20, y + 11), 7)
+                pygame.draw.circle(surf, c, (tx + max(90, lab_w + 10) + k * 20, y + 11), 7)
         # zorluklar
         y2 = ay + 280
-        l = tc.render("DIFFICULTIES", 16, TEXT_DIM, "ui", True)
+        l = tc.render(t("songs.difficulties"), 16, TEXT_DIM, "ui", True)
         surf.blit(l, (ax, y2))
         y2 += 28
         x = ax
         for d in DIFFICULTIES:
             have = d in self.diffs
             col = DIFF_COLORS[d] if have else (60, 56, 80)
-            chip = tc.render(d.upper(), 18, (15, 12, 25) if have else (100, 96, 120), "ui", True)
+            chip = tc.render(upper(diff_name(d)), 18, (15, 12, 25) if have else (100, 96, 120), "ui", True)
             r = pygame.Rect(x, y2, chip.get_width() + 24, 32)
             pygame.draw.rect(surf, col, r, border_radius=16)
             surf.blit(chip, (r.x + 12, r.y + 6))
@@ -217,22 +290,28 @@ class SongListScene(Scene):
             y3 = y2 + 52
             for d in self.diffs:
                 tr = self.chart.tracks[d]
-                txt = f"{d.capitalize():<8}{len(tr.notes):>5} notes   {len(tr.sp_phrases)} SP phrases" + (
-                    f"   {len(tr.solos)} solo" if tr.solos else "")
-                img = tc.render(txt, 18, TEXT_DIM, "mono")
-                surf.blit(img, (ax, y3))
+                name = tc.render(diff_name(d), 18, TEXT_DIM, "ui", True)
+                txt = t("songs.track_line", notes=len(tr.notes), sp=len(tr.sp_phrases)) + (
+                    "   " + t("songs.solo", n=len(tr.solos)) if tr.solos else "")
+                img = tc.render(txt, 18, TEXT_DIM, "ui")
+                surf.blit(name, (ax, y3))
+                surf.blit(img, (ax + 90, y3))
                 y3 += 26
         elif self._loaded_for == s.folder:
             err = self.app.library.chart_error(s.folder)
-            img = tc.render(("Chart error: " + err)[:70], 16, (255, 120, 120))
+            img = tc.render(t("songs.chart_error", err=err)[:70], 16, (255, 120, 120))
             surf.blit(img, (ax, y2 + 52))
         # on izleme gostergesi
         if self.preview_started:
             for k in range(5):
                 h = 6 + 10 * abs(math.sin(self.t * 6 + k * 1.3))
                 pygame.draw.rect(surf, NEON_PINK, (det.right - 60 + k * 8, det.bottom - 24 - h, 5, h))
-        draw_hints(surf, a, [("Up/Down / Strum", "Move"), ("Enter / Green", "Select"), ("Tab", "Settings"),
-                             ("Esc / Red", "Back")])
+        hints = [("key.updown", "hint.move"), ("key.enter_green", "hint.select"), ("Tab", "hint.settings"),
+                 ("I", "hint.import")]
+        if s.auto_chart:
+            hints.append(("R", "hint.rechart"))
+        hints.append(("key.esc_red", "hint.back"))
+        draw_hints(surf, a, hints)
 
 
 class DifficultyScene(Scene):
@@ -289,7 +368,7 @@ class DifficultyScene(Scene):
         # yukleme ekrani bir frame goster
         surf = self.app.screen
         fade_overlay(surf, 200, (4, 2, 12))
-        img = self.assets.text.glow("LOADING...", 48, (255, 130, 215), glow_color=NEON_PINK)
+        img = self.assets.text.glow(t("diffsel.loading"), 48, (255, 130, 215), glow_color=NEON_PINK)
         surf.blit(img, (W // 2 - img.get_width() // 2, 330))
         if not self.app.headless:
             pygame.display.flip()
@@ -311,8 +390,8 @@ class DifficultyScene(Scene):
         fade_overlay(surf, 150, (4, 2, 12))
         panel = pygame.Rect(W // 2 - 300, 110, 600, 520)
         draw_panel(surf, panel, border=NEON_PINK)
-        t = tc.render(self.info.name, 30, TEXT, "ui", True)
-        surf.blit(t, (W // 2 - t.get_width() // 2, panel.y + 20))
+        ti = tc.render(self.info.name, 30, TEXT, "ui", True)
+        surf.blit(ti, (W // 2 - ti.get_width() // 2, panel.y + 20))
         ar = tc.render(self.info.artist, 18, NEON_CYAN)
         surf.blit(ar, (W // 2 - ar.get_width() // 2, panel.y + 58))
         s = self.app.settings
@@ -332,21 +411,21 @@ class DifficultyScene(Scene):
             if kind == "diff":
                 col = DIFF_COLORS[val]
                 pygame.draw.circle(surf, col, (r.x + 26, r.centery), 9)
-                lab = tc.render(val.upper(), 28 if sel else 26, (255, 255, 255) if sel else TEXT, "title", True)
+                lab = tc.render(upper(diff_name(val)), 28 if sel else 26, (255, 255, 255) if sel else TEXT, "title", True)
                 surf.blit(lab, (r.x + 48, r.centery - lab.get_height() // 2))
                 chart = self.sl.chart
                 if chart is not None:
-                    n = tc.render(f"{len(chart.tracks[val].notes)} notes", 18, TEXT_DIM)
+                    n = tc.render(t("diffsel.notes", n=len(chart.tracks[val].notes)), 18, TEXT_DIM)
                     surf.blit(n, (r.right - n.get_width() - 16, r.centery - n.get_height() // 2))
             else:
-                names = {"nofail": "No Fail", "speed": "Note Speed", "bot": "Autoplay (Bot)"}
+                names = {"nofail": "diffsel.no_fail", "speed": "diffsel.speed", "bot": "diffsel.bot"}
                 if val == "nofail":
-                    v = "ON" if s.engine.no_fail else "OFF"
+                    v = t("common.on") if s.engine.no_fail else t("common.off")
                 elif val == "speed":
                     v = f"{s.video.note_speed:.1f}x"
                 else:
-                    v = "ON" if s.extra.get("autoplay") else "OFF"
-                lab = tc.render(names[val], 22, TEXT if sel else TEXT_DIM, "ui", True)
+                    v = t("common.on") if s.extra.get("autoplay") else t("common.off")
+                lab = tc.render(t(names[val]), 22, TEXT if sel else TEXT_DIM, "ui", True)
                 surf.blit(lab, (r.x + 20, r.centery - lab.get_height() // 2))
                 vs = tc.render(f"<  {v}  >" if sel else v, 22, NEON_ORANGE if sel else TEXT, "ui", True)
                 surf.blit(vs, (r.right - vs.get_width() - 16, r.centery - vs.get_height() // 2))
@@ -355,5 +434,5 @@ class DifficultyScene(Scene):
         if err:
             e = tc.render(err[:80], 16, (255, 120, 120))
             surf.blit(e, (W // 2 - e.get_width() // 2, panel.bottom - 30))
-        draw_hints(surf, a, [("Up/Down", "Select"), ("Left/Right", "Change"), ("Enter / Green", "Play"),
-                             ("Esc / Red", "Back")])
+        draw_hints(surf, a, [("key.updown", "hint.select"), ("key.leftright", "hint.change"),
+                             ("key.enter_green", "hint.play"), ("key.esc_red", "hint.back")])

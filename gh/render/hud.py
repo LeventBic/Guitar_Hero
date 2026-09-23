@@ -6,6 +6,7 @@ import math
 
 import pygame
 
+from ..i18n import t
 from .assets import (NEON_CYAN, NEON_ORANGE, NEON_PINK, SP_BLUE, TEXT, TEXT_DIM, W, lerp_color,
                      lighten, radial_glow, scale_color)
 
@@ -244,12 +245,12 @@ class HUD:
         surf.blit(sh, (ORB_C[0] - ms.get_width() // 2 + 2, ORB_C[1] - ms.get_height() // 2 + 2))
         surf.blit(ms, (ORB_C[0] - ms.get_width() // 2, ORB_C[1] - ms.get_height() // 2))
         # seri
-        lab = a.text.render("STREAK", 16, TEXT_DIM, "ui", True)
+        lab = a.text.render(t("hud.streak"), 16, TEXT_DIM, "ui", True)
         surf.blit(lab, (38, 586))
         cs = a.text.render(str(eng.combo), 40, lighten(col, 0.3) if eng.combo else TEXT_DIM, "title", True)
         surf.blit(cs, (38, 602))
         if st.autoplay:
-            b = a.text.render("BOT", 16, (20, 20, 30), "ui", True)
+            b = a.text.render(t("common.bot"), 16, (20, 20, 30), "ui", True)
             r = pygame.Rect(38, 664, b.get_width() + 16, 22)
             pygame.draw.rect(surf, NEON_CYAN, r, border_radius=6)
             surf.blit(b, (r.x + 8, r.y + 2))
@@ -275,20 +276,20 @@ class HUD:
         pygame.draw.polygon(surf, (250, 250, 255), needle)
         pygame.draw.circle(surf, (60, 60, 80), GAUGE_C, 10)
         pygame.draw.circle(surf, (200, 200, 220), GAUGE_C, 10, 2)
-        lab = a.text.render("ROCK METER" if st.rock_active else "NO FAIL", 14, TEXT_DIM, "ui", True)
+        lab = a.text.render(t("hud.rock_meter") if st.rock_active else t("hud.no_fail"), 14, TEXT_DIM, "ui", True)
         surf.blit(lab, (GAUGE_C[0] - lab.get_width() // 2, GAUGE_C[1] + 14))
         # star power bari
         x0, y0, bw, bh = W - 296, 676, 256, 18
         sp = eng.sp_meter
         ready = sp >= 0.5 and not eng.sp_active
-        lab = a.text.render("STAR POWER", 14, (150, 210, 255) if (ready or eng.sp_active) else TEXT_DIM, "ui", True)
+        lab = a.text.render(t("hud.star_power"), 14, (150, 210, 255) if (ready or eng.sp_active) else TEXT_DIM, "ui", True)
         surf.blit(lab, (x0, y0 - 18))
         if ready:
             k = 0.5 + 0.5 * math.sin(self.clock * 10)
-            rd = a.text.render("READY!", 14, lerp_color((120, 200, 255), (255, 255, 255), k), "ui", True)
+            rd = a.text.render(t("hud.ready"), 14, lerp_color((120, 200, 255), (255, 255, 255), k), "ui", True)
             surf.blit(rd, (x0 + bw - rd.get_width(), y0 - 18))
         elif eng.sp_active:
-            rd = a.text.render("ACTIVE", 14, (120, 220, 255), "ui", True)
+            rd = a.text.render(t("hud.active"), 14, (120, 220, 255), "ui", True)
             surf.blit(rd, (x0 + bw - rd.get_width(), y0 - 18))
         pygame.draw.rect(surf, (8, 8, 16), (x0 - 3, y0 - 3, bw + 6, bh + 6), border_radius=8)
         seg_w = (bw - 9) / 4
@@ -353,13 +354,13 @@ class HUD:
         pygame.draw.line(surf, (200, 200, 220), (cx, y - 7), (cx, y + 7), 2)
         for k in (-1, 1):
             pygame.draw.line(surf, (90, 86, 120), (cx + k * half, y - 5), (cx + k * half, y + 5), 1)
-        e = self.a.text.render("EARLY", 11, TEXT_DIM, "ui", True)
-        l = self.a.text.render("LATE", 11, TEXT_DIM, "ui", True)
+        e = self.a.text.render(t("hud.early"), 11, TEXT_DIM, "ui", True)
+        l = self.a.text.render(t("hud.late"), 11, TEXT_DIM, "ui", True)
         surf.blit(e, (cx - half - e.get_width() - 8, y - 7))
         surf.blit(l, (cx + half + 8, y - 7))
         win = max(0.001, st.window)
-        for (t, off) in self.timing_marks:
-            age = self.clock - t
+        for (t0, off) in self.timing_marks:
+            age = self.clock - t0
             if age > 2.5:
                 continue
             k = 1 - age / 2.5
@@ -379,8 +380,8 @@ class HUD:
         pygame.draw.rect(box, (14, 10, 30, 215), (0, 0, *r.size), border_radius=14)
         pygame.draw.rect(box, NEON_ORANGE + (255,), (0, 0, *r.size), 2, border_radius=14)
         surf.blit(box, r.topleft)
-        t = a.text.render("SOLO", 18, NEON_ORANGE, "ui", True)
-        surf.blit(t, (r.centerx - t.get_width() // 2, r.y + 8))
+        ti = a.text.render(t("hud.solo"), 18, NEON_ORANGE, "ui", True)
+        surf.blit(ti, (r.centerx - ti.get_width() // 2, r.y + 8))
         tot = max(1, so["total"])
         pct = int(100 * so["hits"] / tot)
         ps = a.text.render(f"{pct}%", 46, TEXT, "title", True)

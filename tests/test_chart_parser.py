@@ -250,7 +250,8 @@ def test_load_song_folder(tmp_path):
     info = ch.info
     assert info.name == "Folder Song" and info.artist == "Band"
     assert ch.offset == pytest.approx(0.6)
-    assert set(info.stems) == {"song", "guitar", "rhythm", "drums_2", "crowd"}
+    # .flac da ses uzantisi (ice aktarilan FLAC sarkilar song.flac olarak kopyalanir)
+    assert set(info.stems) == {"song", "guitar", "rhythm", "drums_2", "crowd", "bass"}
     assert os.path.basename(info.stems["guitar"]) == "Guitar.OGG"
     assert os.path.basename(info.album_art) == "album.png"
     assert os.path.basename(info.chart_path) == "notes.chart"

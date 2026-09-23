@@ -6,6 +6,7 @@ Kullanim:
   python main.py --smoke [--song ..] [--diff ..]    headless, simule saat, bot: full combo degilse cikis kodu 1
   python main.py --screenshot out.png --at 42.5 --song .. [--diff ..]   oyun karesi (bot durumu o ana kadar)
   python main.py --screenshot-menu out.png          baslik + sarki listesi + diger menu ekranlari
+  python main.py --import sarki.mp3 [--smoke]       headless: ses dosyasini ekle (otomatik chart), istenirse bot oynasin
 """
 from __future__ import annotations
 
@@ -30,6 +31,9 @@ def parse_args(argv=None):
     p.add_argument("--no-bot", action="store_true", help="--screenshot without autoplay (notes get missed)")
     p.add_argument("--quit-after", type=float, default=0.0, help="quit the game after N seconds (testing)")
     p.add_argument("--fps", type=int, default=None, help="override FPS limit for this run (0 = unlimited)")
+    p.add_argument("--import", dest="import_paths", nargs="+", metavar="PATH",
+                   help="headless: import audio files / folders into Songs (auto-chart); with --smoke the bot "
+                        "then plays the imported songs")
     return p.parse_args(argv)
 
 
@@ -48,8 +52,19 @@ def _pick_diff(chart, want):
 def run_headless(args) -> int:
     from gh import headless
     app = headless.make_app()
+    imported: list[str] = []
+    if args.import_paths:
+        res = headless.import_files(app, args.import_paths)
+        for r in res:
+            print(f"{'OK  ' if r['ok'] else 'FAIL'} {r['name']}: {r['folder'] or r['message']}")
+        imported = [r["folder"] for r in res if r["ok"]]
+        if not imported:
+            return 1
     if args.smoke:
-        results = headless.smoke_all(app, args.song, args.diff.lower() if args.diff else None, args.smoke_fps)
+        songs = [args.song] if args.song else (imported or [None])
+        results = []
+        for song in songs:
+            results += headless.smoke_all(app, song, args.diff.lower() if args.diff else None, args.smoke_fps)
         if not results:
             print("no songs found")
             return 1
@@ -93,6 +108,8 @@ def run_game(args) -> int:
     if args.fps is not None:
         settings.video.fps_limit = max(0, args.fps)
     app.push(TitleScene(app))
+    if not args.song:
+        app.check_inbox()          # Songs/_Import'ta bekleyen ses dosyalari: once ice aktar
     if args.song:
         app.library.scan()
         info = app.library.find(args.song)
@@ -140,7 +157,7 @@ def write_crash_log(exc: BaseException) -> str:
 
 def main(argv=None) -> int:
     args = parse_args(argv)
-    headless_mode = bool(args.smoke or args.screenshot or args.screenshot_menu)
+    headless_mode = bool(args.smoke or args.screenshot or args.screenshot_menu or args.import_paths)
     try:
         return run_headless(args) if headless_mode else run_game(args)
     except SystemExit:

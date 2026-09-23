@@ -14,7 +14,8 @@ from .chart_parser import _apply_chart_meta, _split_sections, _unquote, parse_ch
 from .midi_parser import parse_midi
 from .song_ini import fill_song_info, read_song_ini, read_text_file
 
-AUDIO_EXTS = (".ogg", ".opus", ".mp3", ".wav")
+AUDIO_EXTS = (".ogg", ".opus", ".mp3", ".wav", ".flac")
+SKIP_DIRS = ("_import",)   # ice aktarma gelen kutusu (Songs/_Import) sarki olarak taranmaz
 STEM_NAMES = ("song", "guitar", "rhythm", "bass", "keys", "vocals", "vocals_1", "vocals_2",
               "drums", "drums_1", "drums_2", "drums_3", "drums_4", "crowd", "preview")
 ALBUM_NAMES = ("album.png", "album.jpg", "album.jpeg")
@@ -127,7 +128,7 @@ def scan_songs(root: str | os.PathLike, errors: list[tuple[str, str]] | None = N
     if not os.path.isdir(root):
         return result
     for dirpath, dirnames, _filenames in os.walk(root):
-        dirnames.sort()
+        dirnames[:] = sorted(d for d in dirnames if d.lower() not in SKIP_DIRS)
         files = _listing(dirpath)
         if not any(n in files for n in CHART_NAMES):
             continue

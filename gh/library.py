@@ -51,6 +51,12 @@ class SongLibrary:
                 self._chart_errors[key] = f"{type(exc).__name__}: {exc}"
         return c
 
+    def invalidate(self, folder: str) -> None:
+        """Onbellekteki chart'i unut (yeniden chart'lama / ice aktarma sonrasi)."""
+        key = os.path.normcase(os.path.realpath(folder))
+        self._charts.pop(key, None)
+        self._chart_errors.pop(key, None)
+
     def chart_error(self, folder: str) -> str:
         return self._chart_errors.get(os.path.normcase(os.path.realpath(folder)), "")
 

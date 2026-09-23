@@ -27,6 +27,8 @@ class App:
     def __init__(self, settings: AppSettings, *, headless: bool = False, audio: bool = True):
         self.settings = settings
         self.headless = headless
+        from . import i18n
+        i18n.set_language(settings.extra.get("language") or i18n.default_language())
         self.running = True
         self.stack: list = []
         self.window = None
@@ -44,6 +46,17 @@ class App:
         self.total_frames = 0
         self.total_render_ms = 0.0
         self.run_start = 0.0
+        # surukle-birak / ice aktarma
+        self._drop_batch: list[str] = []
+        self._drop_open = False
+        self.pending_drops: list[str] = []     # oyun sirasinda birakilanlar (menuye donunce islenir)
+        self.inbox_failed: set = set()         # bu oturumda basarisiz olan gelen kutusu dosyalari (yol, mtime)
+        self.drop_flash = 0.0                  # son birakma ani (perf_counter), gorsel geri bildirim
+        try:
+            from .importer import inbox_dir
+            inbox_dir(create=True)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ pencere
     def _init_display(self) -> None:
@@ -128,6 +141,69 @@ class App:
             self.stack.pop().exit()
         self.push(SongListScene(self))
 
+    def open_songlist(self, select_folder: str | None = None):
+        """Sarki listesine git (yigindakine; yoksa ana menunun ustune yenisi), kutuphaneyi yenile ve sec."""
+        from .scenes.songlist import SongListScene
+        idx = max((i for i, s in enumerate(self.stack) if isinstance(s, SongListScene)), default=-1)
+        self.input.clear_held()
+        if idx >= 0:
+            while len(self.stack) > idx + 1:
+                self.stack.pop().exit()
+            sl = self.stack[-1]
+            sl.refresh(select_folder)
+            sl.resume()
+            return sl
+        while len(self.stack) > 1:
+            self.stack.pop().exit()
+        sl = SongListScene(self, select_folder=select_folder)
+        self.push(sl)
+        return sl
+
+    # ------------------------------------------------------------------ ice aktarma
+    def handle_drop(self, paths: list[str]) -> None:
+        """Pencereye dosya/klasor birakildi."""
+        import time as _t
+        self.drop_flash = _t.perf_counter()
+        paths = [p for p in paths if p]
+        if not paths:
+            return
+        top = self.top
+        if top is not None and hasattr(top, "on_drop"):
+            top.on_drop(paths)
+            return
+        if top is not None and getattr(top, "blocks_import", False):
+            self.pending_drops.extend(paths)       # oyun / kalibrasyon: sonra
+            return
+        from .scenes.importer import ImportScene
+        self.push(ImportScene(self, paths))
+
+    def inbox_pending(self, include_failed: bool = False) -> list[str]:
+        try:
+            from .importer import inbox_files
+            files = inbox_files()
+        except Exception:
+            return []
+        if include_failed:
+            return files
+        out = []
+        for f in files:
+            try:
+                key = (os.path.normcase(f), os.path.getmtime(f))
+            except OSError:
+                continue
+            if key not in self.inbox_failed:
+                out.append(f)
+        return out
+
+    def check_inbox(self) -> bool:
+        """Songs/_Import'ta yeni ses dosyasi varsa ice aktarma sahnesini ac."""
+        files = self.inbox_pending()
+        if not files:
+            return False
+        from .scenes.importer import ImportScene
+        self.push(ImportScene(self, files, from_inbox=True))
+        return True
+
     def quit(self) -> None:
         self.running = False
 
@@ -148,10 +224,22 @@ class App:
         inp = self.input
         prev, now = inp.begin_poll()
         stamp = inp.stamp(prev, now)
+        drops: list[str] | None = None
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 self.running = False
                 return
+            if ev.type == pygame.DROPBEGIN:
+                self._drop_open = True
+                self._drop_batch = []
+                continue
+            if ev.type == pygame.DROPFILE:
+                self._drop_batch.append(getattr(ev, "file", "") or "")
+                continue
+            if ev.type == pygame.DROPCOMPLETE:
+                self._drop_open = False
+                drops, self._drop_batch = self._drop_batch, []
+                continue
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_F11 or (ev.key == pygame.K_RETURN and ev.mod & pygame.KMOD_ALT):
                     self.toggle_fullscreen()
@@ -161,6 +249,8 @@ class App:
                     continue
             inp.process(ev, stamp)
         inp.update(now)
+        if drops is None and self._drop_batch and not self._drop_open:
+            drops, self._drop_batch = self._drop_batch, []     # DROPBEGIN/COMPLETE gondermeyen surucu
         top = self.top
         if top is None:
             return
@@ -174,9 +264,20 @@ class App:
                 if self.top is not top:
                     break
                 top.on_menu(m)
+            # ekstra kisayollar (ornek: sarki listesinde I / R); oyun tuslarina atanmis tuslar haric
+            for k in list(inp.raw_keys):
+                if self.top is not top:
+                    break
+                if k.key not in inp.keymap:
+                    top.on_shortcut(k.key)
+        if drops:
+            self.handle_drop(drops)
 
     def frame(self, dt: float) -> None:
         t0 = time.perf_counter()
+        if self.pending_drops and self.top is not None and not getattr(self.top, "blocks_import", False):
+            paths, self.pending_drops = self.pending_drops, []
+            self.handle_drop(paths)
         if self.top is not None:
             self.top.update(dt)
         self.draw(self.screen)

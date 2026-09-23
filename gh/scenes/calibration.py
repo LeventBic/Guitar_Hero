@@ -17,6 +17,7 @@ import pygame
 from ..audio import Conductor, wav_bytes
 from ..config import FRET_COLORS
 from ..engine import InputKind
+from ..i18n import t
 from ..render.assets import GOLD, NEON_CYAN, NEON_ORANGE, NEON_PINK, TEXT, TEXT_DIM, W, lerp_color
 from ..render.ui import MenuList, SynthBackground, draw_hints, draw_panel
 from ..settings_store import save_settings
@@ -33,6 +34,8 @@ MATCH_WINDOW = 0.20
 
 
 class CalibrationScene(Scene):
+    blocks_import = True
+
     def __init__(self, app):
         super().__init__(app)
         self.bg = SynthBackground()
@@ -115,23 +118,24 @@ class CalibrationScene(Scene):
             self.conductor.stop()
         if len(errs) < MIN_TAPS:
             self.result_ok = False
-            self.result_msg = f"Only {len(errs)} valid taps (need {MIN_TAPS}). Tap on every click!"
+            self.result_msg = t("cal.too_few", n=len(errs), m=MIN_TAPS)
         else:
             med = statistics.median(errs)
             sd = statistics.pstdev(errs)
             if sd > MAX_STDEV:
                 self.result_ok = False
-                self.result_msg = f"Inconsistent taps (stdev {sd * 1000:.1f} ms > {MAX_STDEV * 1000:.0f} ms). Try again."
+                self.result_msg = t("cal.inconsistent", sd=f"{sd * 1000:.1f}", mx=f"{MAX_STDEV * 1000:.0f}")
             else:
                 self.result_ok = True
                 self.value_ms = int(round(med * 1000))
-                self.result_msg = f"stdev {sd * 1000:.1f} ms over {len(errs)} taps"
+                self.result_msg = t("cal.stats", sd=f"{sd * 1000:.1f}", n=len(errs))
         if audio:
             self.phase = "audio_result"
-            items = ["SAVE & CALIBRATE VIDEO", "SAVE & FINISH", "RETRY", "CANCEL"] if self.result_ok else ["RETRY", "CANCEL"]
+            items = (["cal.save_video", "cal.save_finish", "cal.retry", "cal.cancel"] if self.result_ok
+                     else ["cal.retry", "cal.cancel"])
         else:
             self.phase = "visual_result"
-            items = ["SAVE & FINISH", "RETRY", "CANCEL"] if self.result_ok else ["RETRY", "CANCEL"]
+            items = ["cal.save_finish", "cal.retry", "cal.cancel"] if self.result_ok else ["cal.retry", "cal.cancel"]
         self.menu = MenuList(items, W // 2, 440, spacing=50, size=28)
 
     # ------------------------------------------------------------ girdi
@@ -177,21 +181,21 @@ class CalibrationScene(Scene):
         elif action == "CONFIRM":
             self.sfx("menu_select")
             item = self.menu.items[self.menu.index]
-            if item == "RETRY":
+            if item == "cal.retry":
                 if self.phase == "audio_result":
                     self._start_audio()
                 else:
                     self._start_visual()
-            elif item == "CANCEL":
+            elif item == "cal.cancel":
                 self.app.pop()
-            elif item.startswith("SAVE"):
+            elif item in ("cal.save_video", "cal.save_finish"):
                 if self.phase == "audio_result":
                     s.audio.audio_offset_ms = self.value_ms
                 else:
                     s.video.video_offset_ms = self.value_ms
                 s.extra["calibrated"] = True
                 save_settings(s)
-                if item == "SAVE & CALIBRATE VIDEO":
+                if item == "cal.save_video":
                     self.phase = "visual_intro"
                 else:
                     self.app.pop()
@@ -217,10 +221,10 @@ class CalibrationScene(Scene):
         shade = pygame.Surface((W, 720), pygame.SRCALPHA)
         shade.fill((4, 2, 14, 170))
         surf.blit(shade, (0, 0))
-        head = tc.glow("CALIBRATION", 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
+        head = tc.glow(t("cal.title"), 42, (255, 130, 215), glow_color=NEON_PINK, radius=8)
         surf.blit(head, (W // 2 - head.get_width() // 2, 18))
         s = self.app.settings
-        cur = tc.render(f"current:  audio {s.audio.audio_offset_ms:+d} ms   video {s.video.video_offset_ms:+d} ms",
+        cur = tc.render(t("cal.current", a=f"{s.audio.audio_offset_ms:+d}", v=f"{s.video.video_offset_ms:+d}"),
                         18, TEXT_DIM)
         surf.blit(cur, (W // 2 - cur.get_width() // 2, 84))
         panel = pygame.Rect(W // 2 - 420, 120, 840, 520)
@@ -228,37 +232,37 @@ class CalibrationScene(Scene):
         p = self.phase
         if p == "intro":
             self._text_block(surf, panel, [
-                ("AUDIO CALIBRATION", 30, NEON_CYAN),
-                ("You will hear a metronome at 120 BPM.", 22, TEXT),
-                (f"After {COUNT_IN} count-in clicks, press STRUM (Up/Down) or SPACE", 22, TEXT),
-                ("exactly on every click. Listen - don't watch.", 22, TEXT),
-                (f"At least {MIN_TAPS} taps are needed; the median error becomes the audio offset.", 18, TEXT_DIM),
-                ("Use headphones / your normal speakers and play volume.", 18, TEXT_DIM),
+                (t("cal.audio_title"), 30, NEON_CYAN),
+                (t("cal.audio_1"), 22, TEXT),
+                (t("cal.audio_2", n=COUNT_IN), 22, TEXT),
+                (t("cal.audio_3"), 22, TEXT),
+                (t("cal.audio_4", n=MIN_TAPS), 18, TEXT_DIM),
+                (t("cal.audio_5"), 18, TEXT_DIM),
             ])
-            draw_hints(surf, a, [("Enter", "Start"), ("Tab", "Skip to video"), ("Esc", "Back")])
+            draw_hints(surf, a, [("Enter", "hint.start"), ("Tab", "hint.skip_video"), ("Esc", "hint.back")])
         elif p == "visual_intro":
             self._text_block(surf, panel, [
-                ("VIDEO CALIBRATION", 30, NEON_CYAN),
-                ("No sound this time. Markers fall onto the target line.", 22, TEXT),
-                ("Press STRUM or SPACE exactly when a marker hits the line.", 22, TEXT),
-                ("This measures display + input delay (video offset).", 18, TEXT_DIM),
+                (t("cal.video_title"), 30, NEON_CYAN),
+                (t("cal.video_1"), 22, TEXT),
+                (t("cal.video_2"), 22, TEXT),
+                (t("cal.video_3"), 18, TEXT_DIM),
             ])
-            draw_hints(surf, a, [("Enter", "Start"), ("Esc", "Back")])
+            draw_hints(surf, a, [("Enter", "hint.start"), ("Esc", "hint.back")])
         elif p in ("audio", "visual"):
             self._draw_run(surf, panel)
-            draw_hints(surf, a, [("Strum / Space", "Tap"), ("Esc", "Abort")])
+            draw_hints(surf, a, [("key.strum_space", "hint.tap"), ("Esc", "hint.abort")])
         else:
-            what = "AUDIO" if p == "audio_result" else "VIDEO"
+            what = t("cal.audio_offset") if p == "audio_result" else t("cal.video_offset")
             if self.result_ok:
-                lines = [(f"{what} OFFSET", 26, NEON_CYAN), (f"{self.value_ms:+d} ms", 72, GOLD),
+                lines = [(what, 26, NEON_CYAN), (f"{self.value_ms:+d} ms", 72, GOLD),
                          (self.result_msg, 18, TEXT_DIM)]
             else:
-                lines = [("CALIBRATION FAILED", 30, (255, 110, 110)), (self.result_msg, 20, TEXT)]
+                lines = [(t("cal.failed"), 30, (255, 110, 110)), (self.result_msg, 20, TEXT)]
             self._text_block(surf, panel, lines, top=34)
             if self.errors:
                 self._draw_scatter(surf, pygame.Rect(panel.x + 120, panel.y + 212, panel.w - 240, 40))
             self.menu.draw(surf, a, 440)
-            draw_hints(surf, a, [("Up/Down", "Select"), ("Enter", "Confirm")])
+            draw_hints(surf, a, [("key.updown", "hint.select"), ("Enter", "hint.confirm")])
 
     def _text_block(self, surf, panel, lines, top=None) -> None:
         y = panel.y + (top if top is not None else 60)
@@ -280,7 +284,7 @@ class CalibrationScene(Scene):
 
     def _draw_run(self, surf, panel) -> None:
         tc = self.assets.text
-        t = self.song_t
+        now = self.song_t
         n_valid = 0
         for tp in self.taps:
             if any(abs(tp - c) <= MATCH_WINDOW for c in self.clicks[COUNT_IN - 1:]):
@@ -296,10 +300,10 @@ class CalibrationScene(Scene):
             pygame.draw.circle(surf, col, (cx, cy), r, 6)
             pygame.draw.circle(surf, lerp_color((20, 16, 40), col, k * 0.6), (cx, cy), r - 10)
             if beat_i < COUNT_IN - 1:
-                txt = str(COUNT_IN - 1 - beat_i) if beat_i >= 0 else "Get ready..."
+                txt = str(COUNT_IN - 1 - beat_i) if beat_i >= 0 else t("cal.get_ready")
                 img = tc.render(txt, 48 if beat_i >= 0 else 26, TEXT, "title", True)
             else:
-                img = tc.render("TAP!", 44, TEXT, "title", True)
+                img = tc.render(t("cal.tap"), 44, TEXT, "title", True)
             surf.blit(img, (cx - img.get_width() // 2, cy - img.get_height() // 2))
         else:
             # dusen isaretler -> hedef cizgi
@@ -308,7 +312,7 @@ class CalibrationScene(Scene):
             pygame.draw.line(surf, (230, 230, 245), (x0, line_y), (x1, line_y), 4)
             speed = 320.0
             for i, c in enumerate(self.clicks):
-                dy = (c - t) * speed
+                dy = (c - now) * speed
                 y = line_y - dy
                 if panel.y + 20 < y < line_y + 30:
                     col = FRET_COLORS[i % 5]
@@ -323,8 +327,8 @@ class CalibrationScene(Scene):
         age = self.t - self.tap_flash
         if 0 <= age < 0.12:
             pygame.draw.circle(surf, (255, 255, 255), (panel.right - 50, panel.y + 50), 14)
-        prog = tc.render(f"taps: {n_valid} / {MIN_TAPS}+", 22, GOLD if n_valid >= MIN_TAPS else TEXT, "ui", True)
+        prog = tc.render(t("cal.taps", n=n_valid, m=MIN_TAPS), 22, GOLD if n_valid >= MIN_TAPS else TEXT, "ui", True)
         surf.blit(prog, (panel.x + 30, panel.bottom - 50))
         remain = max(0, len(self.clicks) - 1 - beat_i)
-        rm = tc.render(f"{remain} clicks left", 18, TEXT_DIM)
+        rm = tc.render(t("cal.left", n=remain), 18, TEXT_DIM)
         surf.blit(rm, (panel.right - rm.get_width() - 30, panel.bottom - 46))

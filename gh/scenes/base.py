@@ -8,6 +8,7 @@ import pygame
 class Scene:
     opaque = True          # False: alttaki sahne once cizilir
     capture_keys = False   # True: yalnizca ham KEYDOWN olaylari (tus atama)
+    blocks_import = False  # True: birakilan dosyalar bu sahne kapanana kadar bekletilir (oyun, kalibrasyon)
 
     def __init__(self, app):
         self.app = app
@@ -22,6 +23,7 @@ class Scene:
     def on_menu(self, action: str) -> None: ...
     def on_game(self, gi) -> None: ...
     def on_key(self, ev: pygame.event.Event) -> None: ...
+    def on_shortcut(self, key: int) -> None: ...      # menu eylemi olmayan tuslar (capture_keys=False iken)
 
     # dongu
     def update(self, dt: float) -> None:

@@ -16,7 +16,18 @@ gh/                      (paket; "Riff.Core" karşılığı = config, timing, mo
     midi_parser.py       parse_midi(path, cfg, ini) -> Chart (kendi SMF okuyucusu, bağımlılıksız)
     song_ini.py          read_song_ini(path) -> dict
     hopo.py              resolve_note_types(notes, threshold_ticks, ...) (ortak HOPO/akor mantığı)
-    loader.py            load_song(folder) -> Chart ; scan_songs(root) -> list[SongInfo]
+    loader.py            load_song(folder) -> Chart ; scan_songs(root) -> list[SongInfo]  (Songs/_Import taranmaz)
+  autochart/             otomatik chart uretici (yalniz numpy, pygame IMPORT ETMEZ, deterministik; D10)
+    dsp.py               yeniden ornekleme, STFT, cok bantli spektral aki, tepe secimi, harmonik toplam perde, kroma
+    tempo.py             tempo adaylari (otokorelasyon + onsel), yerel tempo egrisi, Ellis DP beat takibi, olcu fazi
+    structure.py         olcu oz-benzerligi + Foote yenilik egrisi -> bolumler, kumeleme, Intro/Verse/Chorus adlari
+    analysis.py          analyze(samples, sr) -> Analysis (tempo, vuruslar, onset'ler + perde/sustain, bolumler)
+    charter.py           generate(...) -> ChartResult/.chart metni: tempo haritasi (tick 0 = ses 0, vurus basina B),
+                         niceleme (16'lik/uclemeler), Viterbi perde konturu, akor/sustain, H/M/E indirgeme, SP, dogrulama
+  audio_meta.py          ID3v1/v2, Ogg Vorbis/Opus, FLAC, WAV INFO etiket + kapak okuyucu (saf Python)
+  importer.py            import_audio / rechart_song / import_song_folder (arka plan is parcacigina uygun, ilerleme)
+  album_art.py           prosedurel kapak cizimi (demo sarkilar + kapaksiz ice aktarmalar)
+  i18n.py                arayuz dili tablosu (tr/en), t(key), dile duyarli upper()
   engine/                oyun mantığı (deterministik, saf)                  [Ajan B]
     input_event.py       InputEvent, InputKind
     events.py            GameEvent, EvType
@@ -26,7 +37,8 @@ gh/                      (paket; "Riff.Core" karşılığı = config, timing, mo
   audio.py               Conductor (ses saati), stem çalma, gitar kısma, sfx
   input.py               klavye + joystick -> InputEvent (zaman damgalı)
   render/                highway, gem, sustain, perde butonları, efektler, HUD
-  scenes/                menü, şarkı listesi, zorluk, oyun, duraklatma, sonuç, kalibrasyon, ayarlar
+  scenes/                menü, şarkı listesi, zorluk, oyun, duraklatma, sonuç, kalibrasyon, ayarlar,
+                         şarkı ekleme (importer.py: sürükle-bırak alanı + ilerleme; ConfirmScene)
   settings_store.py      settings.json oku/yaz
   sfx.py                 numpy ile sentezlenmiş efekt sesleri                [Ajan C]
 main.py                  giriş noktası
@@ -121,4 +133,8 @@ class GuitarEngine:
 - **Headless**: `main.py --smoke / --screenshot / --screenshot-menu` simüle saatle çalışır (`gh/headless.py`), `settings.json`'a yazmaz.
 
 ## Şarkı klasörü (R08, Clone Hero uyumlu)
-`Songs/<Sanatçı - Şarkı>/notes.chart | notes.mid`, `song.ini`, `song.ogg` (gitarsız mix), `guitar.ogg` (izole gitar), opsiyonel `rhythm/bass/keys/drums*/vocals/crowd` + `album.png`. Ses uzantıları: `.ogg .opus .mp3 .wav`.
+`Songs/<Sanatçı - Şarkı>/notes.chart | notes.mid`, `song.ini`, `song.ogg` (gitarsız mix), `guitar.ogg` (izole gitar), opsiyonel `rhythm/bass/keys/drums*/vocals/crowd` + `album.png`. Ses uzantıları: `.ogg .opus .mp3 .wav .flac`.
+İçe aktarılan şarkı: `song.<uzantı>` (tek stem, tüm miks) + otomatik `notes.chart` + `song.ini` (`charter = RIFF Auto`, `auto_chart = 1`) + `album.png`. Gelen kutusu: `Songs/_Import` (taranmaz).
+
+## Sürükle-bırak / içe aktarma akışı
+`App.poll` `DROPBEGIN/DROPFILE/DROPCOMPLETE` olaylarını toplar → üstteki sahnede `on_drop` varsa (ImportScene) kuyruğa ekler, `blocks_import` sahnelerinde (oyun, duraklatma, kalibrasyon) bekletir, diğer durumlarda `ImportScene` açar. İş arka plan iş parçacığında (`gh.importer`; ekran/yazı tipi çağrısı yok), sahne her karede ilerlemeyi okur; bitince kütüphane yeniden taranır, `App.open_songlist(klasör)` şarkıyı seçer.

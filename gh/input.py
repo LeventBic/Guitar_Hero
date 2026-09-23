@@ -62,14 +62,14 @@ else:
 JOY_BUTTONS = {0: "fret0", 1: "fret1", 3: "fret2", 2: "fret3", 4: "fret4", 5: "open_strum",
                6: "star_power", 7: "start"}
 
-CONTROLLER_HELP = [
-    ("Green / Red / Yellow / Blue / Orange", "A / B / Y / X / LB"),
-    ("Strum up / down", "D-pad up / down (strum bar)"),
-    ("Whammy", "Right stick X (guitar) or right trigger"),
-    ("Star Power", "Tilt (right stick Y) or Back / Select"),
-    ("Open strum", "RB"),
-    ("Pause / Start", "Start"),
-    ("Menus", "A confirm, B back, D-pad / strum move"),
+CONTROLLER_HELP = [   # i18n anahtarlari (gh.i18n.t ile cizilir)
+    ("ctl.frets", "ctl.frets_v"),
+    ("ctl.strum", "ctl.strum_v"),
+    ("ctl.whammy", "ctl.whammy_v"),
+    ("ctl.sp", "ctl.sp_v"),
+    ("ctl.open", "ctl.open_v"),
+    ("ctl.pause", "ctl.pause_v"),
+    ("ctl.menus", "ctl.menus_v"),
 ]
 
 
