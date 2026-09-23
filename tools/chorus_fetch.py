@@ -8,6 +8,9 @@ Kullanim:
   .venv\\Scripts\\python.exe tools\\chorus_fetch.py --md5 410e6812... --songs D:\\RIFF\\Songs
   .venv\\Scripts\\python.exe tools\\chorus_fetch.py --from-file liste.txt           # satir basina "Sanatci Sarki"
 
+Yalniz Expert'i olan chart'lara Hard / Medium / Easy, Expert notalarindan secilerek eklenir (senkron ayni kalir);
+var olan klasor icin: --fill <klasor>.
+
 Secim: sanatci + sarki adi eslesen, oyundan cikarilmis resmi chart olmayan (Harmonix / Neversoft / ...),
 gitar Expert'i olan ilk sonuc (API alaka sirasi). Indirilen dosyalar ve telif: kisisel kullanim icindir;
 Songs/ git'e girmez. Servis bagisla ayakta: istekler arasinda bekleme var, toplu indirmede asiri yuklemeyin.
@@ -31,6 +34,7 @@ if ROOT not in sys.path:
 
 from gh.chart.sng import extract_sng  # noqa: E402
 from gh.chart.song_ini import strip_rich_text  # noqa: E402
+from gh.importer import fill_difficulties  # noqa: E402
 
 API = "https://api.enchor.us/search"
 FILES = "https://files.enchor.us/{md5}.sng"
@@ -114,6 +118,9 @@ def download(md5: str, songs_dir: str, name_hint: tuple[str, str] = ("", "")) ->
             dest = os.path.join(songs_dir, f"{base} ({k})")
             k += 1
         extract_sng(tmp, dest)
+        made = fill_difficulties(dest)
+        if made:
+            print(f"FILLED     {', '.join(made)} (from the hand-made Expert)")
         with open(os.path.join(dest, "song.ini"), "a", encoding="utf-8", newline="\n") as f:
             f.write(f"chorus_md5 = {md5}\n")
         return dest
@@ -147,7 +154,12 @@ def main(argv=None) -> int:
     p.add_argument("--from-file", help="text file: one 'Artist Song' query per line (# comments)")
     p.add_argument("--dry-run", action="store_true", help="show picks without downloading")
     p.add_argument("--allow-official", action="store_true", help="also pick charts ripped from official games")
+    p.add_argument("--fill", metavar="FOLDER", help="add missing Hard/Medium/Easy to an existing song folder")
     a = p.parse_args(argv)
+    if a.fill:
+        made = fill_difficulties(a.fill)
+        print(f"FILLED     {', '.join(made)}" if made else "nothing to fill (no Expert-only notes.chart)")
+        return 0
     if a.md5:
         print("SAVED", download(a.md5.lower(), a.songs))
         return 0

@@ -588,5 +588,18 @@ def import_song_folder(path: str, songs_root: str, progress=None) -> str:
     except Exception as exc:
         shutil.rmtree(dest, ignore_errors=True)
         raise ImportFailed(f"cannot copy folder: {exc}", "imp.err_write", err=str(exc)) from exc
+    fill_difficulties(dest)
     _progress(progress, 1.0, "Done")
     return dest
+
+
+def fill_difficulties(folder: str) -> list[str]:
+    """Yalniz Expert'i olan notes.chart'a Hard / Medium / Easy ekle (Expert notalarindan secim; hata olursa dokunma)."""
+    path = os.path.join(folder, "notes.chart")
+    if not os.path.isfile(path):
+        return []
+    try:
+        from .autochart.fill import fill_chart_file
+        return fill_chart_file(path)
+    except Exception:                      # bozuk / alisilmadik chart: oldugu gibi oynanir
+        return []

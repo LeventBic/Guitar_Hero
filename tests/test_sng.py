@@ -66,3 +66,28 @@ def test_strip_rich_text():
     assert strip_rich_text("a<br>b") == "a b"
     assert strip_rich_text("Rock & <Roll>") == "Rock & <Roll>"          # etiket olmayan acili metin korunur
     assert strip_rich_text("<size=20>Big</size>") == "Big"
+
+
+def test_fill_missing_difficulties_from_hand_expert():
+    """Demo sarkinin el yapimi chart'indan yalniz Expert birakilir; eksikler Expert notalarindan uretilir."""
+    import glob
+    import re
+
+    from gh.autochart.charter import validate
+    from gh.autochart.fill import fill_missing_difficulties
+    from gh.chart import parse_chart
+    src = sorted(glob.glob(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Songs",
+                                        "RIFF Demo Band - *", "notes.chart")))[0]
+    text = open(src, encoding="utf-8").read()
+    only_expert = re.sub(r"\[(Hard|Medium|Easy)Single\]\s*\{.*?\n\}\s*", "", text, flags=re.S)
+    assert set(parse_chart(only_expert).tracks) == {"expert"}
+    new, made = fill_missing_difficulties(only_expert)
+    assert made == ["hard", "medium", "easy"]
+    c = parse_chart(new)
+    n = {d: len(c.tracks[d].notes) for d in ("easy", "medium", "hard", "expert")}
+    assert n["easy"] < n["medium"] < n["hard"] <= n["expert"], n
+    ex_ticks = {x.tick for x in c.tracks["expert"].notes}
+    assert all(x.tick in ex_ticks for d in ("easy", "medium", "hard") for x in c.tracks[d].notes)   # senkron ayni
+    assert max(x.mask for x in c.tracks["easy"].notes) < 8                                           # Easy: 3 perde
+    assert all(ok for ok, _m in validate(new).values())
+    assert fill_missing_difficulties(new) == (new, [])                                               # ikinci kez: degismez
