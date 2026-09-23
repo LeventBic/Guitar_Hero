@@ -98,7 +98,9 @@ def _fake_lead_input(transcribed_lead: bool):
 def test_weak_lead_region_and_line():
     from gh.autochart.guitar import apply_lead, weak_lead_regions
     gi, lead = _fake_lead_input(False)
-    regions = weak_lead_regions(gi)
+    flux = np.array([t for t, _p in lead])
+    assert weak_lead_regions(gi, flux_times=np.array([0.3])) == []   # atak yok: tutulan akor vuruntusu
+    regions = weak_lead_regions(gi, flux_times=flux)
     assert len(regions) == 1
     a, b = regions[0]
     assert 9.5 < a < 10.5 and 24.5 < b < 25.5
@@ -113,7 +115,7 @@ def test_weak_lead_region_and_line():
     assert [e for e in out if e.time < a and e.root == 40]            # bolge disinda ritim kalir
     # transkribe edilmis lead zayif degildir
     gi2, _ = _fake_lead_input(True)
-    assert weak_lead_regions(gi2) == []
+    assert weak_lead_regions(gi2, flux_times=flux) == []
 
 
 def test_drop_pitch_spikes():
@@ -207,6 +209,8 @@ def test_import_and_rechart_in_guitar_mode(tmp_path, realmix, mixer):
     assert not any(n.endswith(".wav") for n in names)                    # miks kopyalanmaz: stem toplami = miks
     ini = open(os.path.join(folder, "song.ini"), encoding="utf-8").read()
     assert "auto_chart_mode = guitar" in ini and "auto_chart_version = 2" in ini
+    # Demucs ile ayrilan distorsiyonlu tutulan akorlarin vuruntusu solo sanilmamali (atak kosulu)
+    assert "Guitar Solo" not in open(os.path.join(folder, "notes.chart"), encoding="utf-8").read()
     song = load_song(folder)
     assert song.info.stems["guitar"].endswith("guitar.ogg") and song.info.stems["song"].endswith("song.ogg")
     assert set(song.tracks) == {"easy", "medium", "hard", "expert"}

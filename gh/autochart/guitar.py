@@ -293,7 +293,7 @@ def build_events(gi: GuitarInput, act_t: np.ndarray, act: np.ndarray,
                                   end=max(end, tc), picked=s_f >= 0.45, low=low, bright=bright))
     fix_octaves(events)
     events = chug_fill(gi, events, active)
-    regions = weak_lead_regions(gi)
+    regions = weak_lead_regions(gi, flux_times=ft)
     if regions:
         events = apply_lead(gi, events, regions, active)
         if lead_out is not None:
@@ -340,13 +340,24 @@ def _explained(gi: GuitarInput, times: np.ndarray, pitches: np.ndarray, tol: flo
     return out
 
 
-def weak_lead_regions(gi: GuitarInput, win: float = 6.0, hop: float = 1.0) -> list[tuple[float, float]]:
+def weak_lead_regions(gi: GuitarInput, win: float = 6.0, hop: float = 1.0,
+                      flux_times: np.ndarray | None = None) -> list[tuple[float, float]]:
     """Distorsiyonlu solo: ritim gitari (chug) ile ayni stem'de, basic-pitch notalari esigin altinda kalir ama
     yuksek perdede yogun onset tepeleri birakir. Tepelerin cogu hicbir notayla / harmonigiyle
-    aciklanamiyor (>= %50), saniyede >= 5 ve perdeleri yuksekse (medyan >= 72) bolge 'zayif lead' sayilir."""
+    aciklanamiyor (>= %50), saniyede >= 5, perdeleri yuksek (medyan >= 72) ve en az %40'i gitar stem'inde gercek
+    bir ataga (spektral aki tepesi, +-30 ms) denk geliyorsa bolge 'zayif lead' sayilir. Son kosul tutulan
+    distorsiyonlu akorlarin vuruntusunu (akisi olmayan harmonik tepeleri) eler."""
     pt, pp, _pv = onset_peaks(gi, 64, LEAD_HI, 0.3)
     if pt.size < LEAD_MIN_RATE * win:
         return []
+    if flux_times is None:
+        flux_times, _fs = flux_onsets(gi.audio, gi.sr)
+    ft = np.sort(np.asarray(flux_times, dtype=np.float64))
+    if not ft.size:
+        return []
+    k = np.clip(np.searchsorted(ft, pt), 1, ft.size - 1) if ft.size > 1 else np.zeros(pt.size, dtype=int)
+    near = np.minimum(np.abs(ft[k] - pt), np.abs(ft[np.maximum(k - 1, 0)] - pt))
+    attack = near <= 0.03
     un = ~_explained(gi, pt, pp)
     marked: list[tuple[float, float]] = []
     for s in np.arange(0.0, float(pt[-1]) + hop, hop):
@@ -354,7 +365,8 @@ def weak_lead_regions(gi: GuitarInput, win: float = 6.0, hop: float = 1.0) -> li
         n = int(w.sum())
         u = w & un
         nu = int(u.sum())
-        if nu >= LEAD_MIN_RATE * win and nu >= 0.5 * n and float(np.median(pp[u])) >= 72:
+        if (nu >= LEAD_MIN_RATE * win and nu >= 0.5 * n and float(np.median(pp[u])) >= 72
+                and float(attack[u].mean()) >= 0.4):
             marked.append((float(s), float(s + win)))
     regions: list[tuple[float, float]] = []
     for a, b in marked:
