@@ -1,0 +1,12 @@
+# RIFF - Python 3.14 (Windows). Kurulum:
+#   py -3.14 -m venv .venv
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+pygame-ce==2.5.8
+numpy==2.5.3
+onnxruntime==1.30.0          # gitar kalibrasyonu (Demucs + basic-pitch ONNX modelleri, assets/models)
+soundfile==0.14.0            # OGG stem yazimi / etiket okuma
+
+# gelistirme: testler ve exe paketleme
+pytest==9.1.1
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.7

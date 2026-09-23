@@ -6,8 +6,25 @@ Plan: [PLAN.md](PLAN.md) · Mimari: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ![oyun](docs/screenshots/gameplay_star_power.png)
 
+## İndir ve oyna (Windows)
+1. [Releases](https://github.com/LeventBic/Guitar_Hero/releases/latest) sayfasından `RIFF-windows.zip`'i indir.
+2. Zip'i bir klasöre çıkar, `RIFF\RIFF.exe`'yi çalıştır (kurulum gerekmez; klasörün tamamı birlikte kalmalı).
+3. Kendi şarkını eklemek için MP3/OGG/FLAC dosyasını oyun penceresine sürükle (aşağıda: *Kendi şarkını ekle*).
+
+## Kaynaktan çalıştırma
+Python 3.14 (Windows) gerekir.
+```powershell
+git clone https://github.com/LeventBic/Guitar_Hero.git
+cd Guitar_Hero
+py -3.14 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe tools\make_demo_songs.py    # demo şarkılar -> Songs\ (~11 s)
+.\.venv\Scripts\python.exe main.py
+```
+Kendi exe'ni üretmek: `powershell -ExecutionPolicy Bypass -File build.ps1 -Zip` → `dist\RIFF\RIFF.exe` + `dist\RIFF-windows.zip`.
+
 ## Oynamak
-`dist\RIFF\RIFF.exe` (klasörün tamamı birlikte taşınmalı; `Songs\` exe'nin yanında).
+`RIFF.exe` (klasörün tamamı birlikte taşınmalı; `Songs\` exe'nin yanında).
 Kendi şarkıların: Clone Hero formatındaki klasörleri (`notes.chart`/`notes.mid`, `song.ini`, `song.ogg`, `guitar.ogg`) `Songs\` içine at.
 
 | Aksiyon | Klavye | Xbox 360 gitar |
@@ -43,7 +60,7 @@ Herhangi bir şarkıyı (MP3, OGG, WAV, FLAC, OPUS) oyuna at, 4 zorluğun notala
 ## Geliştirme
 ```powershell
 .\.venv\Scripts\python.exe main.py                     # oyunu kaynaktan çalıştır
-.\.venv\Scripts\python.exe -m pytest tests -q           # 165 test
+.\.venv\Scripts\python.exe -m pytest tests -q           # 185 test
 .\.venv\Scripts\python.exe main.py --smoke              # tüm şarkı × zorluk bot ile headless
 .\.venv\Scripts\python.exe main.py --song "Songs\RIFF Demo Band - Voltage Run" --diff expert --autoplay
 .\.venv\Scripts\python.exe tools\make_demo_songs.py     # demo şarkıları yeniden üret (~11 s)
